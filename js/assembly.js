@@ -20,14 +20,14 @@ const CONFIG = {
     pcb: {
       path: 'assets/models/OASIS.glb',
       start: { pos: [-0.08, 0.06, 0.08], rot: [0, -0.6, 0.3] },
-      home: { pos: [-0.11162, 0.048, -0.001], rot: [0, 0, 0] },
-      modelRot: [Math.PI / 2, 0, 0],
+      home: { pos: [0, 0, 0], rot: [0, 0, 0] },
+      modelRot: [0, 0, 0],
       material: { color: 0x4a6741, roughness: 0.75, metalness: 0.1 },
     },
     top: {
       path: 'assets/models/TOP.gltf',
       start: { pos: [0, 0.14, 0], rot: [-0.4, -0.5, 0] },
-      home: { pos: [0.01817, -0.001, 0.00246], rot: [0, 0, 0] },
+      home: { pos: [0, 0, 0], rot: [0, 0, 0] },
       material: { color: 0xf6f6f4, roughness: 0.55, metalness: 0.04 },
     },
     button: {
@@ -149,9 +149,130 @@ function fitCameraToAssembly() {
 }
 
 function applyModelRotation(model, rot) {
-  if (!rot) return;
+  if (!rot || (rot[0] === 0 && rot[1] === 0 && rot[2] === 0)) return;
   model.rotation.set(rot[0], rot[1], rot[2]);
   model.updateMatrixWorld(true);
+}
+
+function box3WithOffset(box, offset) {
+  const b = box.clone();
+  b.min.add(offset);
+  b.max.add(offset);
+  return b;
+}
+
+function overflowScore(caseBox, partBox, pos) {
+  const fitted = box3WithOffset(partBox, pos);
+  const margin = 0.0012;
+  let score = 0;
+  score += Math.max(0, caseBox.min.x + margin - fitted.min.x);
+  score += Math.max(0, fitted.max.x - (caseBox.max.x - margin));
+  score += Math.max(0, caseBox.min.y + margin - fitted.min.y);
+  score += Math.max(0, fitted.max.y - (caseBox.max.y - margin));
+  score += Math.max(0, caseBox.min.z + margin - fitted.min.z);
+  score += Math.max(0, fitted.max.z - (caseBox.max.z - margin));
+  return score;
+}
+
+function vec3ToArr(v) {
+  return [v.x, v.y, v.z];
+}
+
+function fitPcbToCase(caseModel, pcbModel) {
+  const caseBox = new THREE.Box3().setFromObject(caseModel);
+  const caseSize = caseBox.getSize(new THREE.Vector3());
+  const inset = 0.0012;
+  const rotations = [
+    [-Math.PI / 2, 0, Math.PI / 2],
+    [-Math.PI / 2, 0, -Math.PI / 2],
+    [Math.PI / 2, 0, 0],
+    [-Math.PI / 2, 0, 0],
+    [-Math.PI / 2, Math.PI / 2, 0],
+  ];
+
+  let best = null;
+
+  for (const rot of rotations) {
+    const probe = pcbModel.clone(true);
+    probe.rotation.set(rot[0], rot[1], rot[2]);
+    probe.updateMatrixWorld(true);
+
+    let pcbBox = new THREE.Box3().setFromObject(probe);
+    let pcbSize = pcbBox.getSize(new THREE.Vector3());
+    const scale = Math.min(
+      (caseSize.x - inset * 2) / pcbSize.x,
+      (caseSize.y - inset * 2) / pcbSize.y,
+      (caseSize.z - inset * 2) / pcbSize.z,
+      1,
+    );
+
+    if (scale < 0.999) {
+      probe.scale.multiplyScalar(scale);
+      probe.updateMatrixWorld(true);
+      pcbBox = new THREE.Box3().setFromObject(probe);
+      pcbSize = pcbBox.getSize(new THREE.Vector3());
+    }
+
+    const pcbC = pcbBox.getCenter(new THREE.Vector3());
+    const caseC = caseBox.getCenter(new THREE.Vector3());
+
+    const candidates = [
+      new THREE.Vector3(caseC.x - pcbC.x, caseC.y - pcbC.y, caseC.z - pcbC.z),
+      new THREE.Vector3(
+        caseBox.min.x + inset - pcbBox.min.x,
+        caseC.y - pcbC.y,
+        caseBox.min.z + inset - pcbBox.min.z,
+      ),
+      new THREE.Vector3(
+        caseBox.min.x + inset - pcbBox.min.x,
+        caseBox.min.y + inset - pcbBox.min.y,
+        caseBox.min.z + inset - pcbBox.min.z,
+      ),
+    ];
+
+    for (const pos of candidates) {
+      const overflow = overflowScore(caseBox, pcbBox, pos);
+      const score = overflow * 100 + Math.abs(pcbSize.y - caseSize.y) * 0.2;
+      if (!best || score < best.score) {
+        best = { rot, pos: vec3ToArr(pos), scale, score, overflow };
+      }
+    }
+  }
+
+  return best;
+}
+
+function computeHomes(caseModel, topModel, pcbModel, buttonModel) {
+  const caseBox = new THREE.Box3().setFromObject(caseModel);
+  const caseC = caseBox.getCenter(new THREE.Vector3());
+  const inset = 0.0012;
+
+  const topBox = new THREE.Box3().setFromObject(topModel);
+  const topC = topBox.getCenter(new THREE.Vector3());
+  const topHome = {
+    pos: vec3ToArr(new THREE.Vector3(
+      caseC.x - topC.x,
+      -0.006,
+      caseC.z - topC.z + 0.0055,
+    )),
+    rot: [0, 0, 0],
+  };
+
+  const btnBox = new THREE.Box3().setFromObject(buttonModel);
+  const btnC = btnBox.getCenter(new THREE.Vector3());
+  const buttonHome = {
+    pos: vec3ToArr(new THREE.Vector3(
+      caseC.x - btnC.x,
+      caseC.y - btnC.y + 0.007,
+      caseBox.max.z - inset - btnBox.max.z,
+    )),
+    rot: [0, 0, 0],
+  };
+
+  const buttonOffsets = CONFIG.parts.button.offsets.map((o) => ({ y: o.y }));
+  const pcb = fitPcbToCase(caseModel, pcbModel);
+
+  return { topHome, buttonHome, buttonOffsets, pcb };
 }
 
 function normalizePcbScale(caseModel, pcbModel) {
@@ -179,7 +300,23 @@ async function initModels() {
   applyMaterial(pcbModel, CONFIG.parts.pcb.material);
   applyMaterial(topModel, CONFIG.parts.top.material);
 
+  const homes = computeHomes(caseModel, topModel, pcbModel, buttonModel);
+  CONFIG.parts.top.home = homes.topHome;
+  CONFIG.parts.button.home = homes.buttonHome;
+  CONFIG.parts.button.offsets = homes.buttonOffsets;
+  CONFIG.parts.pcb.home = { pos: homes.pcb.pos, rot: [0, 0, 0] };
+  CONFIG.parts.pcb.modelRot = homes.pcb.rot;
+  window.__OASIS_HOMES = {
+    top: CONFIG.parts.top.home,
+    pcb: { pos: homes.pcb.pos, rot: homes.pcb.rot, scale: homes.pcb.scale, overflow: homes.pcb.overflow },
+    button: CONFIG.parts.button.home,
+  };
+
   applyModelRotation(pcbModel, CONFIG.parts.pcb.modelRot);
+  if (homes.pcb.scale && homes.pcb.scale < 0.999) {
+    pcbModel.scale.multiplyScalar(homes.pcb.scale);
+    pcbModel.updateMatrixWorld(true);
+  }
   normalizePcbScale(caseModel, pcbModel);
 
   parts.case = new THREE.Group();
@@ -282,7 +419,7 @@ function updateAssembly(progress) {
         ],
         rot: CONFIG.parts.button.home.rot,
       });
-      btn.visible = buttonsActive && localP > 0.01;
+      btn.visible = buttonsActive && (localP > 0.01 || p > 0.92);
     });
   }
 
@@ -292,7 +429,7 @@ function updateAssembly(progress) {
     parts.top.visible = p >= CONFIG.stages[3].start;
   }
 
-  const rotY = p * 0.2;
+  const rotY = p * 0.12;
   assembly.rotation.y = rotY;
 
   let activeStage = CONFIG.stages[0];
