@@ -14,21 +14,26 @@ const CONFIG = {
     case: {
       path: 'assets/models/CASE.gltf',
       start: { pos: [0, -0.06, 0.04], rot: [0.2, 0.4, 0] },
+      home: { pos: [0, 0, 0], rot: [0, 0, 0] },
       material: { color: 0xf6f6f4, roughness: 0.55, metalness: 0.04 },
     },
     pcb: {
       path: 'assets/models/OASIS.glb',
-      start: { pos: [-0.1, 0, 0.06], rot: [0, -0.8, 0.2] },
+      start: { pos: [-0.08, 0.06, 0.08], rot: [0, -0.6, 0.3] },
+      home: { pos: [-0.11162, 0.048, -0.001], rot: [0, 0, 0] },
+      modelRot: [Math.PI / 2, 0, 0],
       material: { color: 0x4a6741, roughness: 0.75, metalness: 0.1 },
     },
     top: {
       path: 'assets/models/TOP.gltf',
       start: { pos: [0, 0.14, 0], rot: [-0.4, -0.5, 0] },
+      home: { pos: [0.01817, -0.001, 0.00246], rot: [0, 0, 0] },
       material: { color: 0xf6f6f4, roughness: 0.55, metalness: 0.04 },
     },
     button: {
       path: 'assets/models/BUTTON.gltf',
       start: { pos: [0, 0, 0.1], rot: [0.5, 0, 0] },
+      home: { pos: [0, 0, 0], rot: [0, 0, 0] },
       material: { color: 0xfafaf8, roughness: 0.45, metalness: 0.06 },
       offsets: [
         { y: 0.0162 },
@@ -123,6 +128,7 @@ function loadModel(path) {
 }
 
 function fitCameraToAssembly() {
+  updateAssembly(1);
   const box = new THREE.Box3().setFromObject(assembly);
   const size = box.getSize(new THREE.Vector3());
   const center = box.getCenter(new THREE.Vector3());
@@ -139,6 +145,13 @@ function fitCameraToAssembly() {
   camera.updateProjectionMatrix();
 
   ground.position.y = box.min.y - 0.004;
+  updateAssembly(0);
+}
+
+function applyModelRotation(model, rot) {
+  if (!rot) return;
+  model.rotation.set(rot[0], rot[1], rot[2]);
+  model.updateMatrixWorld(true);
 }
 
 function normalizePcbScale(caseModel, pcbModel) {
@@ -166,6 +179,7 @@ async function initModels() {
   applyMaterial(pcbModel, CONFIG.parts.pcb.material);
   applyMaterial(topModel, CONFIG.parts.top.material);
 
+  applyModelRotation(pcbModel, CONFIG.parts.pcb.modelRot);
   normalizePcbScale(caseModel, pcbModel);
 
   parts.case = new THREE.Group();
@@ -200,10 +214,12 @@ async function initModels() {
 }
 
 function centerAssembly() {
+  updateAssembly(1);
   const box = new THREE.Box3().setFromObject(assembly);
   const center = box.getCenter(new THREE.Vector3());
   assembly.position.sub(center);
   assembly.position.y += 0.005;
+  updateAssembly(0);
 }
 
 function easeOutCubic(t) {
@@ -234,13 +250,13 @@ function updateAssembly(progress) {
 
   if (parts.case) {
     const t = stageProgress(p, CONFIG.stages[0]);
-    lerpPart(parts.case, CONFIG.parts.case.start, t);
+    lerpPart(parts.case, CONFIG.parts.case.start, t, CONFIG.parts.case.home);
     parts.case.visible = p >= CONFIG.stages[0].start;
   }
 
   if (parts.pcb) {
     const t = stageProgress(p, CONFIG.stages[1]);
-    lerpPart(parts.pcb, CONFIG.parts.pcb.start, t);
+    lerpPart(parts.pcb, CONFIG.parts.pcb.start, t, CONFIG.parts.pcb.home);
     parts.pcb.visible = p >= CONFIG.stages[1].start;
   }
 
@@ -258,14 +274,21 @@ function updateAssembly(progress) {
         ],
         rot: [...CONFIG.parts.button.start.rot],
       };
-      lerpPart(btn, start, localP, { pos: [0, btn.userData.homeY, 0], rot: [0, 0, 0] });
+      lerpPart(btn, start, localP, {
+        pos: [
+          CONFIG.parts.button.home.pos[0],
+          CONFIG.parts.button.home.pos[1] + btn.userData.homeY,
+          CONFIG.parts.button.home.pos[2],
+        ],
+        rot: CONFIG.parts.button.home.rot,
+      });
       btn.visible = buttonsActive && localP > 0.01;
     });
   }
 
   if (parts.top) {
     const t = stageProgress(p, CONFIG.stages[3]);
-    lerpPart(parts.top, CONFIG.parts.top.start, t);
+    lerpPart(parts.top, CONFIG.parts.top.start, t, CONFIG.parts.top.home);
     parts.top.visible = p >= CONFIG.stages[3].start;
   }
 
