@@ -134,10 +134,10 @@ function fitCameraToAssembly() {
   const center = box.getCenter(new THREE.Vector3());
   const maxDim = Math.max(size.x, size.y, size.z, 0.01);
   const fov = camera.fov * (Math.PI / 180);
-  const dist = (maxDim * 0.85) / Math.tan(fov / 2);
+  const dist = (maxDim * 1.05) / Math.tan(fov / 2);
 
-  lookTarget.set(center.x + 0.012, center.y, center.z);
-  cameraBase.set(center.x + 0.012 + dist * 0.1, center.y + dist * 0.02, center.z + dist * 1.2);
+  lookTarget.set(center.x + 0.008, center.y, center.z);
+  cameraBase.set(center.x + 0.008 + dist * 0.08, center.y + dist * 0.04, center.z + dist * 1.15);
   camera.position.copy(cameraBase);
   camera.lookAt(lookTarget);
   camera.near = dist / 100;
@@ -181,14 +181,20 @@ function vec3ToArr(v) {
 function fitPcbToCase(caseModel, pcbModel) {
   const caseBox = new THREE.Box3().setFromObject(caseModel);
   const caseSize = caseBox.getSize(new THREE.Vector3());
-  const inset = 0.0012;
+  const caseC = caseBox.getCenter(new THREE.Vector3());
+  const inset = 0.0018;
+  const overrides = window.__OASIS_OVERRIDES || {};
   const rotations = [
     [-Math.PI / 2, 0, Math.PI / 2],
     [-Math.PI / 2, 0, -Math.PI / 2],
+    [Math.PI / 2, 0, Math.PI / 2],
     [Math.PI / 2, 0, 0],
     [-Math.PI / 2, 0, 0],
-    [-Math.PI / 2, Math.PI / 2, 0],
+    [0, 0, Math.PI / 2],
   ];
+
+  if (overrides.pcbRot === 'rx90') rotations.unshift([Math.PI / 2, 0, 0]);
+  if (overrides.pcbRot === 'rx-90-rz90') rotations.unshift([-Math.PI / 2, 0, Math.PI / 2]);
 
   let best = null;
 
@@ -214,28 +220,16 @@ function fitPcbToCase(caseModel, pcbModel) {
     }
 
     const pcbC = pcbBox.getCenter(new THREE.Vector3());
-    const caseC = caseBox.getCenter(new THREE.Vector3());
+    const pos = new THREE.Vector3(
+      caseC.x - pcbC.x,
+      caseC.y - pcbC.y + 0.006,
+      caseBox.min.z + inset + pcbSize.z * 0.5 - pcbC.z,
+    );
 
-    const candidates = [
-      new THREE.Vector3(caseC.x - pcbC.x, caseC.y - pcbC.y, caseC.z - pcbC.z),
-      new THREE.Vector3(
-        caseBox.min.x + inset - pcbBox.min.x,
-        caseC.y - pcbC.y,
-        caseBox.min.z + inset - pcbBox.min.z,
-      ),
-      new THREE.Vector3(
-        caseBox.min.x + inset - pcbBox.min.x,
-        caseBox.min.y + inset - pcbBox.min.y,
-        caseBox.min.z + inset - pcbBox.min.z,
-      ),
-    ];
-
-    for (const pos of candidates) {
-      const overflow = overflowScore(caseBox, pcbBox, pos);
-      const score = overflow * 100 + Math.abs(pcbSize.y - caseSize.y) * 0.2;
-      if (!best || score < best.score) {
-        best = { rot, pos: vec3ToArr(pos), scale, score, overflow };
-      }
+    const overflow = overflowScore(caseBox, pcbBox, pos);
+    const score = overflow * 100 + Math.abs(pcbSize.x - caseSize.x) * 0.05;
+    if (!best || score < best.score) {
+      best = { rot, pos: vec3ToArr(pos), scale, score, overflow };
     }
   }
 
@@ -249,30 +243,67 @@ function computeHomes(caseModel, topModel, pcbModel, buttonModel) {
 
   const topBox = new THREE.Box3().setFromObject(topModel);
   const topC = topBox.getCenter(new THREE.Vector3());
+
+  const btnBox = new THREE.Box3().setFromObject(buttonModel);
+  const btnC = btnBox.getCenter(new THREE.Vector3());
+  const btnSize = btnBox.getSize(new THREE.Vector3());
+
+  const overrides = window.__OASIS_OVERRIDES || {};
+  const stackY = caseBox.max.y - topBox.min.y;
+  const topY = overrides.topY ?? stackY;
+  const topZ = overrides.topZ ?? (caseC.z - topC.z);
+
   const topHome = {
     pos: vec3ToArr(new THREE.Vector3(
       caseC.x - topC.x,
-      -0.006,
-      caseC.z - topC.z + 0.0055,
+      topY,
+      topZ,
     )),
     rot: [0, 0, 0],
   };
 
-  const btnBox = new THREE.Box3().setFromObject(buttonModel);
-  const btnC = btnBox.getCenter(new THREE.Vector3());
+  const buttonSpacing = overrides.buttonSpacing ?? (btnSize.y * 1.05);
   const buttonHome = {
     pos: vec3ToArr(new THREE.Vector3(
       caseC.x - btnC.x,
-      caseC.y - btnC.y + 0.007,
+      caseC.y - btnC.y + 0.008,
       caseBox.max.z - inset - btnBox.max.z,
     )),
     rot: [0, 0, 0],
   };
 
-  const buttonOffsets = CONFIG.parts.button.offsets.map((o) => ({ y: o.y }));
+  const buttonOffsets = [
+    { y: buttonSpacing },
+    { y: 0 },
+    { y: -buttonSpacing },
+  ];
   const pcb = fitPcbToCase(caseModel, pcbModel);
 
-  return { topHome, buttonHome, buttonOffsets, pcb };
+  return { topHome, buttonHome, buttonOffsets, pcb, caseBox, topBox, btnBox };
+}
+
+function reportMetrics() {
+  if (!parts.case || !parts.top || !parts.pcb) return null;
+
+  updateAssembly(1);
+  assembly.updateMatrixWorld(true);
+
+  const caseBox = new THREE.Box3().setFromObject(parts.case);
+  const topBox = new THREE.Box3().setFromObject(parts.top);
+  const pcbBox = new THREE.Box3().setFromObject(parts.pcb);
+  const btnBox = parts.buttons.length
+    ? new THREE.Box3().setFromObject(parts.buttons[1] || parts.buttons[0])
+    : null;
+
+  const shellGapY = topBox.min.y - caseBox.max.y;
+  const topGapX = Math.abs(topBox.getCenter(new THREE.Vector3()).x - caseBox.getCenter(new THREE.Vector3()).x);
+  const pcbOverflowX = Math.max(0, pcbBox.max.x - caseBox.max.x)
+    + Math.max(0, caseBox.min.x - pcbBox.min.x);
+
+  const metrics = { shellGapY, topGapX, pcbOverflowX };
+  window.__OASIS_METRICS = metrics;
+  updateAssembly(0);
+  return metrics;
 }
 
 function normalizePcbScale(caseModel, pcbModel) {
@@ -300,24 +331,7 @@ async function initModels() {
   applyMaterial(pcbModel, CONFIG.parts.pcb.material);
   applyMaterial(topModel, CONFIG.parts.top.material);
 
-  const homes = computeHomes(caseModel, topModel, pcbModel, buttonModel);
-  CONFIG.parts.top.home = homes.topHome;
-  CONFIG.parts.button.home = homes.buttonHome;
-  CONFIG.parts.button.offsets = homes.buttonOffsets;
-  CONFIG.parts.pcb.home = { pos: homes.pcb.pos, rot: [0, 0, 0] };
-  CONFIG.parts.pcb.modelRot = homes.pcb.rot;
-  window.__OASIS_HOMES = {
-    top: CONFIG.parts.top.home,
-    pcb: { pos: homes.pcb.pos, rot: homes.pcb.rot, scale: homes.pcb.scale, overflow: homes.pcb.overflow },
-    button: CONFIG.parts.button.home,
-  };
-
-  applyModelRotation(pcbModel, CONFIG.parts.pcb.modelRot);
-  if (homes.pcb.scale && homes.pcb.scale < 0.999) {
-    pcbModel.scale.multiplyScalar(homes.pcb.scale);
-    pcbModel.updateMatrixWorld(true);
-  }
-  normalizePcbScale(caseModel, pcbModel);
+  applyHomes(caseModel, pcbModel, topModel, buttonModel);
 
   parts.case = new THREE.Group();
   parts.case.add(caseModel);
@@ -348,7 +362,42 @@ async function initModels() {
   centerAssembly();
   fitCameraToAssembly();
   setInitialState();
+  reportMetrics();
 }
+
+function applyHomes(caseModel, pcbModel, topModel, buttonModel) {
+  const homes = computeHomes(caseModel, topModel, pcbModel, buttonModel);
+  CONFIG.parts.top.home = homes.topHome;
+  CONFIG.parts.button.home = homes.buttonHome;
+  CONFIG.parts.button.offsets = homes.buttonOffsets;
+  CONFIG.parts.pcb.home = { pos: homes.pcb.pos, rot: [0, 0, 0] };
+  CONFIG.parts.pcb.modelRot = homes.pcb.rot;
+
+  pcbModel.rotation.set(0, 0, 0);
+  pcbModel.scale.set(1, 1, 1);
+  applyModelRotation(pcbModel, CONFIG.parts.pcb.modelRot);
+  if (homes.pcb.scale && homes.pcb.scale < 0.999) {
+    pcbModel.scale.multiplyScalar(homes.pcb.scale);
+    pcbModel.updateMatrixWorld(true);
+  }
+
+  window.__OASIS_HOMES = {
+    top: CONFIG.parts.top.home,
+    pcb: homes.pcb,
+    button: CONFIG.parts.button.home,
+  };
+}
+
+window.__OASIS_REBUILD = async () => {
+  while (assembly.children.length) assembly.remove(assembly.children[0]);
+  parts.case = null;
+  parts.pcb = null;
+  parts.top = null;
+  parts.buttons = [];
+  await initModels();
+  ScrollTrigger.refresh();
+  reportMetrics();
+};
 
 function centerAssembly() {
   updateAssembly(1);
@@ -429,7 +478,7 @@ function updateAssembly(progress) {
     parts.top.visible = p >= CONFIG.stages[3].start;
   }
 
-  const rotY = p * 0.12;
+  const rotY = p * 0.06;
   assembly.rotation.y = rotY;
 
   let activeStage = CONFIG.stages[0];
@@ -448,16 +497,50 @@ function setInitialState() {
   updateAssembly(0);
 }
 
+window.__OASIS_SET_PROGRESS = updateAssembly;
+
+window.__OASIS_DEBUG = () => {
+  updateAssembly(1);
+  const box = new THREE.Box3().setFromObject(assembly);
+  return {
+    assemblyPos: assembly.position.toArray(),
+    assemblyRot: assembly.rotation.toArray(),
+    boxMin: box.min.toArray(),
+    boxMax: box.max.toArray(),
+    boxSize: box.getSize(new THREE.Vector3()).toArray(),
+    cameraPos: camera.position.toArray(),
+    cameraBase: cameraBase.toArray(),
+    lookTarget: lookTarget.toArray(),
+    partsVisible: {
+      case: parts.case?.visible,
+      pcb: parts.pcb?.visible,
+      top: parts.top?.visible,
+      buttons: parts.buttons.map((b) => b.visible),
+    },
+    partPositions: {
+      case: parts.case?.position.toArray(),
+      pcb: parts.pcb?.position.toArray(),
+      top: parts.top?.position.toArray(),
+      buttons: parts.buttons.map((b) => b.position.toArray()),
+    },
+  };
+};
+
 function resize() {
   const parent = canvas.parentElement;
-  const w = parent.clientWidth;
-  const h = parent.clientHeight;
-  renderer.setSize(w, h, false);
+  if (!parent) return;
+  const w = parent.clientWidth || window.innerWidth;
+  const h = parent.clientHeight || window.innerHeight;
+  if (w < 2 || h < 2) return;
+  renderer.setSize(w, h, true);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
 }
 
 window.addEventListener('resize', resize);
+if (window.ResizeObserver) {
+  new ResizeObserver(() => resize()).observe(canvas.parentElement);
+}
 
 let mouseX = 0;
 let mouseY = 0;
