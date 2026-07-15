@@ -149,6 +149,7 @@ img { display: block; max-width: 100%; }
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
+  isolation: isolate;
 }
 
 #assembly-canvas {
@@ -156,6 +157,7 @@ img { display: block; max-width: 100%; }
   inset: 0;
   width: 100%;
   height: 100%;
+  z-index: 1;
 }
 
 .assembly-overlay {
@@ -165,7 +167,7 @@ img { display: block; max-width: 100%; }
   pointer-events: none;
   padding: calc(var(--nav-h) + 2rem) clamp(1.25rem, 4vw, 3rem) 2rem;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(280px, 40%) 1fr;
   grid-template-rows: 1fr auto;
   gap: 1rem;
 }

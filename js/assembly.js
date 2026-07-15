@@ -13,7 +13,7 @@ const CONFIG = {
   parts: {
     case: {
       path: 'assets/models/CASE.gltf',
-      start: { pos: [0, -0.12, 0], rot: [0.3, 0.6, 0] },
+      start: { pos: [0, -0.06, 0.04], rot: [0.2, 0.4, 0] },
       material: { color: 0xf6f6f4, roughness: 0.55, metalness: 0.04 },
     },
     pcb: {
@@ -100,6 +100,8 @@ scene.add(ground);
 
 const loader = new GLTFLoader();
 const parts = { case: null, pcb: null, top: null, buttons: [] };
+const cameraBase = new THREE.Vector3();
+const lookTarget = new THREE.Vector3(0, 0, 0);
 
 function applyMaterial(root, matConfig) {
   root.traverse((child) => {
@@ -120,6 +122,38 @@ function loadModel(path) {
   });
 }
 
+function fitCameraToAssembly() {
+  const box = new THREE.Box3().setFromObject(assembly);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z, 0.01);
+  const fov = camera.fov * (Math.PI / 180);
+  const dist = (maxDim * 0.85) / Math.tan(fov / 2);
+
+  lookTarget.set(center.x + 0.012, center.y, center.z);
+  cameraBase.set(center.x + 0.012 + dist * 0.1, center.y + dist * 0.02, center.z + dist * 1.2);
+  camera.position.copy(cameraBase);
+  camera.lookAt(lookTarget);
+  camera.near = dist / 100;
+  camera.far = dist * 20;
+  camera.updateProjectionMatrix();
+
+  ground.position.y = box.min.y - 0.004;
+}
+
+function normalizePcbScale(caseModel, pcbModel) {
+  const caseBox = new THREE.Box3().setFromObject(caseModel);
+  const pcbBox = new THREE.Box3().setFromObject(pcbModel);
+  const caseSize = caseBox.getSize(new THREE.Vector3());
+  const pcbSize = pcbBox.getSize(new THREE.Vector3());
+  const caseMax = Math.max(caseSize.x, caseSize.y, caseSize.z);
+  const pcbMax = Math.max(pcbSize.x, pcbSize.y, pcbSize.z);
+  if (pcbMax > caseMax * 3) {
+    const scale = caseMax / pcbMax;
+    pcbModel.scale.setScalar(scale);
+  }
+}
+
 async function initModels() {
   const [caseModel, pcbModel, topModel, buttonModel] = await Promise.all([
     loadModel(CONFIG.parts.case.path),
@@ -132,16 +166,20 @@ async function initModels() {
   applyMaterial(pcbModel, CONFIG.parts.pcb.material);
   applyMaterial(topModel, CONFIG.parts.top.material);
 
+  normalizePcbScale(caseModel, pcbModel);
+
   parts.case = new THREE.Group();
   parts.case.add(caseModel);
   assembly.add(parts.case);
 
   parts.pcb = new THREE.Group();
   parts.pcb.add(pcbModel);
+  parts.pcb.visible = false;
   assembly.add(parts.pcb);
 
   parts.top = new THREE.Group();
   parts.top.add(topModel);
+  parts.top.visible = false;
   assembly.add(parts.top);
 
   const btnTemplate = buttonModel.clone(true);
@@ -151,11 +189,13 @@ async function initModels() {
     const btn = new THREE.Group();
     btn.add(btnTemplate.clone(true));
     btn.userData.homeY = offset.y || 0;
+    btn.visible = false;
     parts.buttons.push(btn);
     assembly.add(btn);
   });
 
   centerAssembly();
+  fitCameraToAssembly();
   setInitialState();
 }
 
@@ -182,7 +222,7 @@ function lerpPart(group, startCfg, t, home = { pos: [0, 0, 0], rot: [0, 0, 0] })
     startCfg.rot[1] * (1 - e) + home.rot[1] * e,
     startCfg.rot[2] * (1 - e) + home.rot[2] * e
   );
-  group.visible = t > 0.01 || e > 0.01;
+  group.visible = true;
 }
 
 function stageProgress(global, stage) {
@@ -192,11 +232,21 @@ function stageProgress(global, stage) {
 function updateAssembly(progress) {
   const p = Math.max(0, Math.min(1, progress));
 
-  if (parts.case) lerpPart(parts.case, CONFIG.parts.case.start, stageProgress(p, CONFIG.stages[0]));
-  if (parts.pcb) lerpPart(parts.pcb, CONFIG.parts.pcb.start, stageProgress(p, CONFIG.stages[1]));
+  if (parts.case) {
+    const t = stageProgress(p, CONFIG.stages[0]);
+    lerpPart(parts.case, CONFIG.parts.case.start, t);
+    parts.case.visible = p >= CONFIG.stages[0].start;
+  }
+
+  if (parts.pcb) {
+    const t = stageProgress(p, CONFIG.stages[1]);
+    lerpPart(parts.pcb, CONFIG.parts.pcb.start, t);
+    parts.pcb.visible = p >= CONFIG.stages[1].start;
+  }
 
   if (parts.buttons.length) {
     const btnP = stageProgress(p, CONFIG.stages[2]);
+    const buttonsActive = p >= CONFIG.stages[2].start;
     parts.buttons.forEach((btn, i) => {
       const stagger = i * 0.1;
       const localP = Math.max(0, (btnP - stagger) / (1 - stagger));
@@ -209,12 +259,17 @@ function updateAssembly(progress) {
         rot: [...CONFIG.parts.button.start.rot],
       };
       lerpPart(btn, start, localP, { pos: [0, btn.userData.homeY, 0], rot: [0, 0, 0] });
+      btn.visible = buttonsActive && localP > 0.01;
     });
   }
 
-  if (parts.top) lerpPart(parts.top, CONFIG.parts.top.start, stageProgress(p, CONFIG.stages[3]));
+  if (parts.top) {
+    const t = stageProgress(p, CONFIG.stages[3]);
+    lerpPart(parts.top, CONFIG.parts.top.start, t);
+    parts.top.visible = p >= CONFIG.stages[3].start;
+  }
 
-  const rotY = p * 0.35;
+  const rotY = p * 0.2;
   assembly.rotation.y = rotY;
 
   let activeStage = CONFIG.stages[0];
@@ -255,9 +310,12 @@ canvas.addEventListener('mousemove', (e) => {
 
 function animate() {
   requestAnimationFrame(animate);
-  camera.position.x += (0.04 + mouseX - camera.position.x) * 0.05;
-  camera.position.y += (0.01 - mouseY - camera.position.y) * 0.05;
-  camera.lookAt(0, 0, 0);
+  const targetX = cameraBase.x + mouseX;
+  const targetY = cameraBase.y - mouseY;
+  camera.position.x += (targetX - camera.position.x) * 0.05;
+  camera.position.y += (targetY - camera.position.y) * 0.05;
+  camera.position.z += (cameraBase.z - camera.position.z) * 0.05;
+  camera.lookAt(lookTarget);
   renderer.render(scene, camera);
 }
 
