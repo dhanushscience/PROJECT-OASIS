@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { CHAPTERS, chapterAt, chapterLocal, syncOverlay } from './story.js?v=105';
+import { CHAPTERS, chapterAt, chapterLocal, syncOverlay } from './story.js?v=109';
 
 /**
  * Pinned workbench: sci-fi table + silicone mat.
@@ -831,7 +831,7 @@ function cameraForProgress(p) {
     ? { pos: [0.054, 0.016, 0.25], look: [0, 0.012, 0] }
     : { pos: [0.048, 0.012, 0.235], look: [0, 0.012, 0] };
   const endPop = narrow
-    ? { pos: [0.055, 0.055, 0.28], look: [0, 0.032, 0] }
+    ? { pos: [0.0, 0.058, 0.34], look: [0, 0.026, 0] }
     : { pos: [0.048, 0.05, 0.265], look: [0, 0.03, 0] };
 
   let from = overview;
@@ -1024,11 +1024,12 @@ function updateAssembly(progress) {
     // Slightly shrink on the end beat so the pad clears the fixed footer
     assembly.scale.setScalar(baseScale * (1 - endT * 0.12));
     assembly.position.set(assemblyHome.x, y, assemblyHome.z);
-    // Product slant only on the end / footer beat
+    // Product slant only on the end / footer beat (lighter yaw on phones so it stays centered)
+    const phone = window.innerWidth < 780;
     assembly.rotation.set(
-      -0.1 * endT,
-      0.32 * endT,
-      0.05 * endT,
+      (phone ? -0.06 : -0.1) * endT,
+      (phone ? 0.08 : 0.32) * endT,
+      (phone ? 0.02 : 0.05) * endT,
     );
 
     // Aura group on the real mat top so the semicircle flat edge touches the mat
