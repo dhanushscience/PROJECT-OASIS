@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { CHAPTERS, chapterAt, chapterLocal, syncOverlay } from './story.js?v=109';
+import { CHAPTERS, chapterAt, chapterLocal, syncOverlay } from './story.js?v=111';
 
 /**
  * Pinned workbench: sci-fi table + silicone mat.

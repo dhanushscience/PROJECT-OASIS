@@ -19,7 +19,7 @@ export const CHAPTERS = [
     phase: 'build',
     stage: 'idea',
     label: '01 // THE IDEA',
-    title: 'What I built in 149 hours.',
+    title: 'An interface built to know what you want',
     body: 'OASIS is a context-aware control surface for developers: it watches the app in focus, suggests AI mappings, and runs automations so every key does the right thing for the moment.',
     status: 'Product brief',
     details: [
