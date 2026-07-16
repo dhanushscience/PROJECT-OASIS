@@ -2,264 +2,139 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PROJECT OASIS — Interface Device Companion</title>
-  <meta name="description" content="A context-aware BLE interface device for Windows. Open source hardware and software.">
-  <link rel="icon" href="assets/logo.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>PROJECT OASIS</title>
+  <meta name="description" content="PROJECT OASIS: a context-aware macro pad with KiCad PCB, Fusion enclosure, ESP-IDF BLE firmware, and a Windows companion. Built in 149 hours by Dhanush Science.">
+  <link rel="icon" href="assets/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="assets/app-icon.png" sizes="230x230">
+  <link rel="apple-touch-icon" href="assets/app-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css?v=104">
 </head>
 <body>
-  <div class="grid-bg" aria-hidden="true"></div>
+  <div class="blueprint-bg" aria-hidden="true">
+    <div class="blueprint-frame"></div>
+  </div>
 
   <header class="nav" id="nav">
+    <div class="nav-side nav-side-left">
+      <a href="https://www.linkedin.com/in/dhanushscience" class="nav-tag mono" target="_blank" rel="noopener">@dhanushscience</a>
+    </div>
     <a href="#" class="nav-logo">
       <img src="assets/logo.png" alt="PROJECT OASIS" width="140" height="48">
     </a>
-    <nav class="nav-links">
-      <a href="#features">Features</a>
-      <a href="#software">Software</a>
-      <a href="#specs">Specs</a>
-      <a href="#faq">FAQs</a>
-    </nav>
-    <a href="https://github.com/dhanushscience/PROJECT-OASIS" class="nav-cta mono" target="_blank" rel="noopener">GitHub //</a>
+    <div class="nav-side nav-side-right">
+      <a href="https://github.com/dhanushscience/PROJECT-OASIS" class="nav-cta mono" target="_blank" rel="noopener"><span class="nav-cta-full">GitHub //</span><span class="nav-cta-short">GH</span></a>
+    </div>
   </header>
 
-  <!-- Scroll-driven 3D assembly -->
-  <div class="assembly-wrapper" id="assembly-wrapper">
-    <section class="assembly-stage" id="assembly-stage">
-      <canvas id="assembly-canvas" aria-label="3D product assembly animation"></canvas>
-      <div class="assembly-overlay">
-        <div class="assembly-copy">
-          <p class="assembly-eyebrow mono">OPEN SOURCE · V1.0.0</p>
-          <h1 class="assembly-headline">Assembled<br>by scroll.</h1>
-          <p class="assembly-desc">Case. PCB. Buttons. Top.<br>Every layer, one gesture at a time.</p>
-        </div>
-        <div class="assembly-progress">
-          <div class="progress-track deboss">
-            <div class="progress-fill" id="progress-fill"></div>
+  <div class="workbench" id="workbench">
+    <section class="workbench-stage" id="workbench-stage">
+      <div class="end-orbit" id="end-orbit" aria-hidden="true">
+        <div class="end-orbit-ring"></div>
+        <div class="end-orbit-glow"></div>
+      </div>
+      <canvas id="assembly-canvas" aria-label="3D workbench assembly"></canvas>
+
+      <div class="workbench-overlay">
+        <div class="overlay-left">
+          <div class="story-card emboss" id="story-card">
+            <p class="story-label mono" id="story-label">01 // THE IDEA</p>
+            <h1 class="story-title" id="story-title">What I built in 149 hours.</h1>
+            <p class="story-body" id="story-body">OASIS is a context-aware control surface for developers: it watches the app in focus, suggests AI mappings, and runs automations so every key does the right thing for the moment.</p>
+            <ul class="story-details" id="story-details"></ul>
+            <p class="press-hint mono" id="press-hint">Idea locked in</p>
           </div>
-          <p class="assembly-label mono" id="assembly-label">CASE //</p>
-        </div>
-        <div class="assembly-steps">
-          <span class="step-dot active" data-step="0"></span>
-          <span class="step-dot" data-step="1"></span>
-          <span class="step-dot" data-step="2"></span>
-          <span class="step-dot" data-step="3"></span>
-        </div>
-        <div class="scroll-hint mono">
-          <span>Scroll to assemble</span>
-          <div class="scroll-line"></div>
-        </div>
-      </div>
-    </section>
-    <div class="assembly-spacer" id="assembly-spacer"></div>
-  </div>
 
-  <!-- Marquee -->
-  <div class="marquee-section">
-    <div class="marquee">
-      <div class="marquee-track mono">
-        <span>INTERFACE //</span><span>MEETING //</span><span>MARKETPLACE //</span><span>BLE //</span><span>WINDOWS //</span><span>OPEN SOURCE //</span>
-        <span>INTERFACE //</span><span>MEETING //</span><span>MARKETPLACE //</span><span>BLE //</span><span>WINDOWS //</span><span>OPEN SOURCE //</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Features -->
-  <section class="section" id="features">
-    <div class="section-header reveal">
-      <p class="section-tag mono">FEATURES //</p>
-      <h2>Context-aware keypad for Windows</h2>
-      <p class="section-desc">Automating dev workflows, simplifying online meetings, and extending your desktop — three buttons, infinite context.</p>
-    </div>
-
-    <div class="feature-tabs reveal">
-      <button class="feature-tab active deboss-pill" data-tab="interface">Interface</button>
-      <button class="feature-tab deboss-pill" data-tab="meetings">Meetings</button>
-      <button class="feature-tab deboss-pill" data-tab="marketplace">Marketplace</button>
-      <button class="feature-tab deboss-pill" data-tab="automate">Automate</button>
-    </div>
-
-    <div class="feature-panels reveal">
-      <article class="feature-panel active" data-panel="interface">
-        <div class="feature-panel-text">
-          <span class="feature-num mono">01</span>
-          <h3>Per-app button profiles that switch automatically.</h3>
-          <p>Map shortcuts, launch apps, or trigger web actions. Each key adapts when you change focus — VS Code, Chrome, or your meeting app.</p>
+          <div class="end-cta emboss" id="end-cta" hidden>
+            <p class="story-label mono">COMING SOON</p>
+            <h2 class="end-title">Launching soon.</h2>
+            <p class="end-body">Star the GitHub repo to show interest. When OASIS launches, people who starred get first access.</p>
+            <a
+              class="btn btn-primary mono end-star-btn"
+              id="end-star-btn"
+              href="https://github.com/dhanushscience/PROJECT-OASIS"
+              target="_blank"
+              rel="noopener"
+            >Star on GitHub //</a>
+            <p class="interest-note mono" id="interest-note">Open source if the response is there.</p>
+            <p class="interest-count mono" id="interest-count" hidden></p>
+          </div>
         </div>
-        <div class="feature-panel-visual deboss-card">
-          <div class="mini-ui">
-            <div class="mini-sidebar">
-              <div class="mini-nav active mono">INTERFACE //</div>
-              <div class="mini-nav mono">MEETING //</div>
-              <div class="mini-nav mono">MARKETPLACE //</div>
+
+        <aside class="feature-panel" id="feature-panel" hidden>
+          <div class="feature-mock emboss">
+            <div class="feature-mock-bar">
+              <span class="mono feature-mock-brand">OASIS //</span>
+              <span class="feature-mock-status mono"><span class="dot connected"></span> CONNECTED</span>
             </div>
-            <div class="mini-main">
-              <div class="mini-buttons">
-                <div class="mini-btn deboss"></div>
-                <div class="mini-btn deboss active"></div>
-                <div class="mini-btn deboss"></div>
+            <div class="feature-mock-body">
+              <nav class="feature-mock-side" id="feature-nav" aria-label="Companion sections">
+                <div class="feature-nav-item mono active" data-section="interface">INTERFACE //</div>
+                <div class="feature-nav-item mono" data-section="automate">AUTOMATE //</div>
+                <div class="feature-nav-item mono" data-section="meeting">MEETING //</div>
+                <div class="feature-nav-item mono" data-section="settings">SETTINGS //</div>
+              </nav>
+              <div class="feature-mock-main" id="feature-main">
+                <p class="feature-mock-tag mono" id="feature-section-tag">INTERFACE</p>
+                <ul class="feature-list" id="feature-list"></ul>
+                <div class="feature-pad deboss" aria-hidden="true">
+                  <span class="feature-pad-btn" data-btn="0"></span>
+                  <span class="feature-pad-btn" data-btn="1"></span>
+                  <span class="feature-pad-btn" data-btn="2"></span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </article>
+        </aside>
 
-      <article class="feature-panel" data-panel="meetings">
-        <div class="feature-panel-text">
-          <span class="feature-num mono">02</span>
-          <h3>Join calls without touching your trackpad.</h3>
-          <p>Calendar sync surfaces meeting links before every call. One key joins. Another sends a running-late email — hands stay on the keyboard.</p>
-        </div>
-        <div class="feature-panel-visual deboss-card">
-          <div class="meeting-card">
-            <div class="meeting-time mono">10:00 AM</div>
-            <div class="meeting-title">Design Review</div>
-            <div class="meeting-actions">
-              <span class="pill emboss mono">Join //</span>
-              <span class="pill deboss-pill mono">Running Late</span>
+        <div class="desk-overlay" id="desk-overlay" hidden aria-hidden="true">
+          <p class="desk-overlay-profile mono" id="desk-overlay-profile">LIGHT</p>
+          <div class="desk-overlay-rows">
+            <div class="desk-overlay-row" data-btn="0">
+              <span class="desk-overlay-ind" aria-hidden="true"></span>
+              <span class="desk-overlay-pill mono" data-lbl="0">BTN 1</span>
+            </div>
+            <div class="desk-overlay-row" data-btn="1">
+              <span class="desk-overlay-ind" aria-hidden="true"></span>
+              <span class="desk-overlay-pill mono" data-lbl="1">BTN 2</span>
+            </div>
+            <div class="desk-overlay-row" data-btn="2">
+              <span class="desk-overlay-ind" aria-hidden="true"></span>
+              <span class="desk-overlay-pill mono" data-lbl="2">BTN 3</span>
             </div>
           </div>
         </div>
-      </article>
 
-      <article class="feature-panel" data-panel="marketplace">
-        <div class="feature-panel-text">
-          <span class="feature-num mono">03</span>
-          <h3>Community profiles and browser extensions.</h3>
-          <p>Install pre-built profiles for Spotify, YouTube, VS Code, and more. Bridge your browser and desktop into one tactile layer.</p>
-        </div>
-        <div class="feature-panel-visual deboss-card">
-          <div class="marketplace-grid">
-            <div class="mp-card emboss"><span>🎵</span><small class="mono">Spotify</small></div>
-            <div class="mp-card emboss"><span>▶️</span><small class="mono">YouTube</small></div>
-            <div class="mp-card emboss"><span>💻</span><small class="mono">VS Code</small></div>
-            <div class="mp-card emboss"><span>📊</span><small class="mono">Slides</small></div>
-          </div>
-        </div>
-      </article>
-
-      <article class="feature-panel" data-panel="automate">
-        <div class="feature-panel-text">
-          <span class="feature-num mono">04</span>
-          <h3>Multi-step macros with AI assistance.</h3>
-          <p>Chain keystrokes, app launches, delays, and AI workflows. One press runs your entire sequence.</p>
-        </div>
-        <div class="feature-panel-visual deboss-card">
-          <div class="macro-flow mono">
-            <span class="macro-step deboss-pill">Ctrl+Shift+P</span>
-            <span class="macro-arrow">→</span>
-            <span class="macro-step deboss-pill">Type</span>
-            <span class="macro-arrow">→</span>
-            <span class="macro-step deboss-pill">Enter</span>
-          </div>
-        </div>
-      </article>
-    </div>
-  </section>
-
-  <!-- Software -->
-  <section class="section software" id="software">
-    <div class="software-grid">
-      <div class="software-text reveal">
-        <p class="section-tag mono">SOFTWARE //</p>
-        <h2>The OASIS companion app</h2>
-        <p>Neutral, precise interface design — debossed surfaces, dot-matrix labels, and one-click commit. Pair over BLE, configure profiles, and go.</p>
-        <ul class="software-list">
-          <li><span class="status-dot connected"></span> Bluetooth LE pairing</li>
-          <li><span class="status-dot"></span> Per-app profile switching</li>
-          <li><span class="status-dot"></span> Always-on-top overlay mode</li>
-          <li><span class="status-dot"></span> Battery status sync</li>
-        </ul>
-        <a href="https://github.com/dhanushscience/PROJECT-OASIS" class="btn btn-primary mono" target="_blank" rel="noopener">View on GitHub //</a>
-      </div>
-      <div class="software-visual reveal">
-        <div class="software-mock deboss-card">
-          <div class="mock-sidebar">
-            <div class="mock-nav active mono">INTERFACE //</div>
-            <div class="mock-nav mono">MEETING //</div>
-            <div class="mock-nav mono">SETTINGS //</div>
-          </div>
-          <div class="mock-body">
-            <div class="mock-device deboss">
-              <div class="mock-btn"></div>
-              <div class="mock-btn"></div>
-              <div class="mock-btn"></div>
+        <div class="workbench-chrome">
+          <div class="progress-block">
+            <div class="progress-track deboss">
+              <div class="progress-fill" id="progress-fill"></div>
             </div>
-            <div class="mock-status emboss mono">
-              <span class="dot connected"></span> CONNECTED · 75%
-            </div>
+            <p class="progress-label mono" id="assembly-label">01 // THE IDEA</p>
+          </div>
+          <div class="chapter-dots" id="chapter-dots" aria-hidden="true"></div>
+          <div class="scroll-hint mono">
+            <span>Scroll the workbench</span>
+            <div class="scroll-line"></div>
           </div>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
+  </div>
 
-  <!-- Specs -->
-  <section class="section" id="specs">
-    <div class="section-header reveal">
-      <p class="section-tag mono">SPECIFICATIONS //</p>
-      <h2>Built for builders</h2>
+  <footer class="footer footer-slim" id="site-footer">
+    <div class="footer-inner">
+      <a href="#" class="footer-brand">
+        <img src="assets/logo.png" alt="PROJECT OASIS" class="footer-logo" width="240" height="76">
+      </a>
+      <p class="footer-copy mono">© 2026 PROJECT OASIS · V1.0.0</p>
+      <div class="footer-right">
+        <img src="assets/designed-by.png" alt="Designed by Dhanush Science" class="footer-designed" width="320" height="22">
+      </div>
     </div>
-    <div class="specs-grid reveal">
-      <div class="spec-item deboss-card"><span class="spec-label mono">Material</span><span class="spec-value">3D-printed enclosure</span></div>
-      <div class="spec-item deboss-card"><span class="spec-label mono">MCU</span><span class="spec-value">Seeed XIAO ESP32-C3</span></div>
-      <div class="spec-item deboss-card"><span class="spec-label mono">Connectivity</span><span class="spec-value">Bluetooth LE + USB-C</span></div>
-      <div class="spec-item deboss-card"><span class="spec-label mono">Platform</span><span class="spec-value">Windows 10 / 11</span></div>
-      <div class="spec-item deboss-card"><span class="spec-label mono">Buttons</span><span class="spec-value">3 × tactile switches</span></div>
-      <div class="spec-item deboss-card"><span class="spec-label mono">Battery</span><span class="spec-value">3.7V 1000mAh Li-ion</span></div>
-      <div class="spec-item deboss-card"><span class="spec-label mono">PCB</span><span class="spec-value">Open source KiCad</span></div>
-      <div class="spec-item deboss-card"><span class="spec-label mono">License</span><span class="spec-value">Open Source Hardware</span></div>
-    </div>
-  </section>
-
-  <!-- FAQ -->
-  <section class="section" id="faq">
-    <div class="section-header reveal">
-      <p class="section-tag mono">FAQs //</p>
-      <h2>Common questions</h2>
-    </div>
-    <div class="faq-list reveal">
-      <details class="faq-item deboss-card" open>
-        <summary>What is PROJECT OASIS?</summary>
-        <p>An open-source BLE interface device with three configurable buttons and a Windows companion app for meetings, shortcuts, and automations.</p>
-      </details>
-      <details class="faq-item deboss-card">
-        <summary>How does it connect?</summary>
-        <p>Bluetooth Low Energy via the companion app. USB-C handles charging and ESP32-C3 firmware updates.</p>
-      </details>
-      <details class="faq-item deboss-card">
-        <summary>Can I build my own?</summary>
-        <p>Yes — KiCad PCB files, 3D enclosure models, and ESP-IDF firmware are in the GitHub repository.</p>
-      </details>
-      <details class="faq-item deboss-card">
-        <summary>Which apps are supported?</summary>
-        <p>Any Windows application. Per-app profiles switch automatically when you change focus.</p>
-      </details>
-    </div>
-  </section>
-
-  <!-- CTA -->
-  <section class="section cta">
-    <div class="cta-card deboss-dark reveal">
-      <img src="assets/logo.png" alt="" class="cta-logo" width="160" height="56">
-      <h2>OASIS is just the beginning</h2>
-      <p>Build the hardware, configure the software, and shape what tactile computing becomes.</p>
-      <a href="https://github.com/dhanushscience/PROJECT-OASIS" class="btn btn-primary mono" target="_blank" rel="noopener">Star on GitHub //</a>
-    </div>
-  </section>
-
-  <footer class="footer">
-    <img src="assets/logo.png" alt="PROJECT OASIS" class="footer-logo" width="120" height="40">
-    <div class="footer-links">
-      <a href="https://github.com/dhanushscience/PROJECT-OASIS" target="_blank" rel="noopener">GitHub</a>
-      <a href="#features">Features</a>
-      <a href="#specs">Specs</a>
-    </div>
-    <p class="footer-copy mono">© 2026 PROJECT OASIS · V1.0.0</p>
   </footer>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
@@ -272,7 +147,9 @@
     }
   }
   </script>
-  <script type="module" src="js/assembly.js"></script>
+  <script type="module" src="js/story.js?v=104"></script>
+  <script type="module" src="js/assembly.js?v=104"></script>
+  <script type="module" src="js/interest.js?v=104"></script>
   <script src="js/main.js"></script>
 </body>
 </html>
