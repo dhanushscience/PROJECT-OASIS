@@ -1,35 +1,35 @@
-# PROJECT OASIS — Landing Page
+# PROJECT OASIS
 
-Static one-page site for [PROJECT OASIS](https://github.com/dhanushscience/PROJECT-OASIS).
+### Launching soon.
 
-**Live URL:** https://dhanushscience.github.io/PROJECT-OASIS/
+A context-aware control surface for developers.
 
-## GitHub Pages Setup
+It watches the app in focus, suggests AI mappings, and runs automations so every key does the right thing for the moment.
 
-1. Open **Settings → Pages** in the GitHub repo
-2. Under **Build and deployment**, set **Source** to **Deploy from a branch**
-3. Select branch: `webpage` / folder: `/ (root)`
-4. Save — the site will be live in 1–2 minutes
+Built in **149 hours.**
 
-## Local Preview
+---
 
-```bash
-# Python
-python -m http.server 8080
+## See it
 
-# Node
-npx serve .
-```
+**[dhanushscience.github.io/PROJECT-OASIS](https://dhanushscience.github.io/PROJECT-OASIS/)**
 
-Then open http://localhost:8080
+Scroll the workbench. Watch it assemble. Feel what is coming.
 
-## Structure
+---
 
-```
-index.html          Main page
-css/styles.css      OASIS theme styles
-js/main.js          Parallax, 3D device, interactions
-assets/images/      Product reference images
-```
+## Get first access
 
-This branch contains **only** the marketing website. Project source code will be pushed to `master` separately.
+Star this repo to show interest.
+
+When OASIS launches, people who starred get first access.
+
+**[★ Star PROJECT OASIS](https://github.com/dhanushscience/PROJECT-OASIS)**
+
+Open source if the response is there.
+
+---
+
+<p align="center">
+  <sub>Designed by <a href="https://www.linkedin.com/in/dhanushscience">Dhanush Science</a></sub>
+</p>
