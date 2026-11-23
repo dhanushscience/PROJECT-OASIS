@@ -22,6 +22,7 @@ mod restart;
 mod update;
 // The commands, by screen.
 mod accounts;
+mod analytics;
 mod apps;
 mod icons;
 mod overlay_window;
@@ -149,6 +150,7 @@ fn start_engine(app: &AppHandle, hold_keys: bool) -> Result<EngineHandle, String
         if let oasis_engine::EngineEvent::Transcript { text, typed: true } = &event {
             fixes::watch(events.clone(), text.clone());
         }
+        analytics::on_engine_event(&event);
         onboarding::on_engine_event(&events, &event);
         hud::on_engine_event(&events, &event);
         // 20 times a second while recording, for the pill's bars only: an event name of its own, so
@@ -318,6 +320,9 @@ fn main() {
             models::models_check_again,
             models::models_remove,
             update::check_for_update,
+            analytics::privacy_status,
+            analytics::privacy_choose,
+            analytics::open_privacy_policy,
             update::install_update,
             onboarding::onboarding_state,
             onboarding::onboarding_event,
@@ -415,6 +420,7 @@ fn main() {
             }
             tray.build(app)?;
             update::start(app.handle());
+            analytics::start(app.handle());
             models::start(app.handle());
             Ok(())
         })

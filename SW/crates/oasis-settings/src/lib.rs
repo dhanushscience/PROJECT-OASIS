@@ -28,6 +28,7 @@ pub mod arbiter_bridge;
 pub mod edit;
 pub mod fields;
 pub mod input;
+pub mod privacy;
 pub mod matcher;
 pub mod meetings;
 pub mod migrate;

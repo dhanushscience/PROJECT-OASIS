@@ -1,4 +1,6 @@
 <script>
+  import Head from './Head.svelte';
+  import Ico from './Ico.svelte';
   import { trackUnsaved } from '../busy.svelte.js';
   import { data, saveInput } from '../profiles.svelte.js';
   import { status } from '../status.svelte.js';
@@ -10,7 +12,8 @@
   // What is being changed here; it starts as, and goes back to, what is saved.
   let draft = $state({ ...data.input, keys: [...data.input.keys] });
   $effect(() => { draft = { ...data.input, keys: [...data.input.keys] }; });
-  const dirty = $derived(JSON.stringify(draft) !== JSON.stringify(data.input));
+  // Only the keys wait for Save; the switches save on their own, so they never count as unsaved.
+  const dirty = $derived(JSON.stringify(draft.keys) !== JSON.stringify(data.input.keys));
   trackUnsaved('input', () => dirty);
 
   let problem = $state('');
@@ -21,7 +24,9 @@
     try { await saveInput($state.snapshot(draft)); } catch (e) { problem = String(e); }
     busy = false;
   }
-  const discard = () => { draft = { ...data.input, keys: [...data.input.keys] }; problem = ''; clash = ''; };
+  // A switch saves the moment it is flipped; only the key boxes wait for Save.
+  const flip = (/** @type {'hardware'|'keyboard'|'exclusive'} */ field, /** @type {boolean} */ on) => { draft[field] = on; save(); };
+  const discard =() => { draft = { ...data.input, keys: [...data.input.keys] }; problem = ''; clash = ''; };
 
   // Two buttons cannot have the same key: it would press both. A key already taken is not accepted, and the
   // box keeps what it had.
@@ -67,6 +72,7 @@
 
 <div class="page">
   <section class="group ways" aria-label="Ways to press">
+    <Head title="Ways to press" text="How you press the three buttons. At least one stays on." />
     <div class="mrow">
       <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM12 8h.01M12 12h.01M12 16h.01" /></svg>
       <div class="rtext">
@@ -76,21 +82,20 @@
       {#if draft.hardware && engine?.pad === 'Unavailable'}
         <button class="quiet small" onclick={turnOnBluetooth} disabled={btBusy}>{btBusy ? 'Turning on…' : 'Turn on Bluetooth'}</button>
       {/if}
-      <Switch checked={draft.hardware} label="OASIS interface" onchange={(on) => (draft.hardware = on)} />
+      <Switch checked={draft.hardware} label="OASIS interface" onchange={(on) => flip('hardware', on)} />
     </div>
     {#if btNote}<p class="note" role="status">{btNote}</p>{/if}
 
     <div class="mrow">
       <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v10H3zM7 11h.01M11 11h.01M15 11h.01M8 14h8" /></svg>
       <div class="rtext"><div class="rname">Keyboard keys</div><div class="hint">{draft.keyboard ? 'On. Set the keys below.' : 'Off'}</div></div>
-      <Switch checked={draft.keyboard} label="Keyboard keys" onchange={(on) => (draft.keyboard = on)} />
+      <Switch checked={draft.keyboard} label="Keyboard keys" onchange={(on) => flip('keyboard', on)} />
     </div>
   </section>
 
   {#if draft.keyboard}
     <section class="group" aria-labelledby="keys">
-      <div class="gl" id="keys">Keys for the three buttons</div>
-      <p class="gh">Click a button, then press its shortcut. Tap Shift, Ctrl or Alt by itself to use that key alone. Backspace clears it.</p>
+      <Head id="keys" title="Keys for the three buttons" text="Click a tile, then press its shortcut. Backspace clears it." />
 
       <div class="tiles">
         {#each [0, 1, 2] as i}
@@ -110,8 +115,9 @@
       {#if clash}<div class="clash" role="alert">{clash}</div>{/if}
 
       <div class="srow plain">
-        <div class="rtext"><div class="rname">Keep these keys from other programs</div><div class="hint">The shortcut only presses the button, not the program in front. Shift, Ctrl and Alt on their own still reach it.</div></div>
-        <Switch checked={draft.exclusive} label="Keep these keys from other programs" onchange={(on) => (draft.exclusive = on)} />
+        <Ico n="lock" />
+        <div class="rtext"><div class="rname">Keep these keys from other programs</div><div class="hint">The program in front does not get them.</div></div>
+        <Switch checked={draft.exclusive} label="Keep these keys from other programs" onchange={(on) => flip('exclusive', on)} />
       </div>
     </section>
   {/if}

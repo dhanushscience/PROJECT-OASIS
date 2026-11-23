@@ -2,6 +2,8 @@
   import { status } from '../status.svelte.js';
   import Select from './Select.svelte';
   import Switch from './Switch.svelte';
+  import Head from './Head.svelte';
+  import Ico from './Ico.svelte';
   import TryCommands from './TryCommands.svelte';
   import { data } from '../profiles.svelte.js';
   import { paint } from '../hues.js';
@@ -27,7 +29,7 @@
   /** @param {{ sections: { id: string, fields: Field[] }[] }} reply */
   function take(reply) {
     const voice = reply.sections.find((s) => s.id === 'voice');
-    fields = Object.fromEntries([...(voice?.fields ?? []), ...reply.sections.flatMap((s) => s.fields).filter((f) => ['pad.sounds', 'general.paste_dictation', 'general.paste_tag', 'preferences.browser'].includes(f.id))].map((f) => [f.id, f]));
+    fields = Object.fromEntries([...(voice?.fields ?? []), ...reply.sections.flatMap((s) => s.fields).filter((f) => ['pad.sounds', 'general.paste_dictation', 'preferences.browser'].includes(f.id))].map((f) => [f.id, f]));
     loaded = true;
   }
   async function load() {
@@ -295,15 +297,17 @@
   </section>
 {/snippet}
 
-{#snippet pick(/** @type {string} */ id, /** @type {string} */ name, hint = '')}
+{#snippet pick(/** @type {string} */ id, /** @type {string} */ name, hint = '', ico = '')}
   <div class="srow">
+    {#if ico}<Ico n={ico} />{/if}
     <div class="rtext"><div class="rname">{name}</div>{#if hint || fields[id]?.hint}<div class="hint">{hint || fields[id]?.hint}</div>{/if}</div>
     <div class="ctl sel"><Select value={v(id)} options={opts(id)} label={name} onchange={(x) => set(id, x)} /></div>
   </div>
 {/snippet}
 
-{#snippet toggle(/** @type {string} */ id, /** @type {string} */ name, hint = '')}
+{#snippet toggle(/** @type {string} */ id, /** @type {string} */ name, hint = '', ico = '')}
   <div class="srow">
+    {#if ico}<Ico n={ico} />{/if}
     <div class="rtext"><div class="rname">{name}</div>{#if hint || fields[id]?.hint}<div class="hint">{hint || fields[id]?.hint}</div>{/if}</div>
     <Switch checked={!!v(id)} label={name} onchange={(on) => set(id, on)} />
   </div>
@@ -316,10 +320,12 @@
   {#if part === 'settings'}
   <div class="voice set" inert={locked}>
     <section class="group" aria-label="Hold to talk">
-      <div class="ghead"><span class="lab"><b>01</b> Hold to talk</span><Switch checked={!!v('voice.enabled')} label="Push-to-talk" onchange={(on) => set('voice.enabled', on)} /></div>
-      <p class="gh">{talk[1]} A short tap still runs the button’s own action. The microphone is chosen on the Voice screen.</p>
+      <Head title="Hold to talk" text="Hold the button, speak, let go. A short tap still runs its own action.">
+        <Switch checked={!!v('voice.enabled')} label="Push-to-talk" onchange={(on) => set('voice.enabled', on)} />
+      </Head>
       <div class="srow">
-        <div class="rtext"><div class="rname">Button to hold</div><div class="hint">Hold the lit button to talk. Pick one, or two to hold together.</div></div>
+        <Ico n="press" />
+        <div class="rtext"><div class="rname">Button to hold</div><div class="hint">Pick one, or two to hold together.</div></div>
         <div class="tiles" role="group" aria-label="Button to hold to talk">
           {#each [0, 1, 2] as i}
             {@const on = talkButtons.includes(i)}
@@ -332,16 +338,15 @@
           {/each}
         </div>
       </div>
-      {@render pick('voice.hold_ms', 'Hold for', 'How long to hold before it starts listening.')}
-      {@render toggle('pad.sounds', 'Click sounds', 'A short click when listening starts and when the text is typed.')}
-      {@render pick('voice.speaker', 'Sound output', 'Where the start and end sounds play. Pick your real speaker if a USB microphone takes over the default.')}
+      {@render toggle('pad.sounds', 'Click sounds', 'A short click when recording starts and ends.', 'waves')}
+      {@render pick('voice.speaker', 'Sound output', 'Where those clicks play.', 'speaker')}
     </section>
 
     <section class="group" aria-label="Speech to text">
-      <div class="ghead"><span class="lab"><b>02</b> Speech to text</span></div>
+      <Head title="Speech to text" text={groq ? 'Each recording goes to api.groq.com with your own key.' : 'Private: the recording never leaves this computer.'} />
       <div class="srow">
-        <div class="rtext"><div class="rname">Where speech is turned into text</div>
-          <div class="hint">{groq ? 'Online with Groq: every recording is sent to api.groq.com, using your own key.' : 'Private: the recording never leaves this computer.'}</div></div>
+        <Ico n={groq ? 'cloud' : 'screen'} />
+        <div class="rtext"><div class="rname">Where it is turned into text</div></div>
         <div class="seg" role="radiogroup" aria-label="Where speech is turned into text">
           <button type="button" role="radio" aria-checked={!groq} class:on={!groq} onclick={() => { askGroq = false; set('voice.stt_provider', 2); }}>This computer</button>
           <button type="button" role="radio" aria-checked={groq} class:on={groq} onclick={() => { if (!groq) askGroq = true; }}>Groq online</button>
@@ -354,46 +359,51 @@
         </div>
       {:else if groq}
         <div class="srow">
-          <div class="rtext"><div class="rname">Groq API key</div><div class="hint">{keyNote || (groqKey ? 'A key is stored, protected by Windows. Type a new one to replace it.' : 'Needed for the online option.')}</div></div>
+          <Ico n="apikey" />
+          <div class="rtext"><div class="rname">Groq API key</div><div class="hint">{keyNote || (groqKey ? 'Stored, protected by Windows.' : 'Needed for the online option.')}</div></div>
           <div class="ctl key">
             <input type="password" bind:value={keyText} placeholder={groqKey ? 'Key saved' : 'gsk_…'} aria-label="Groq API key" autocomplete="off" />
             <button class="quiet" onclick={saveKey} disabled={!keyText.trim() && !groqKey}>{keyText.trim() || !groqKey ? 'Save' : 'Remove'}</button>
             <button class="quiet" onclick={testKey} disabled={!groqKey}>Test</button>
           </div>
         </div>
-        {@render toggle('voice.groq_fallback', 'If Groq fails, use this computer', 'Keeps dictation working when you are offline or the key is refused.')}
+        {@render toggle('voice.groq_fallback', 'If Groq fails, use this computer', 'Keeps working offline.', 'refresh')}
       {/if}
     </section>
 
     <section class="group" aria-label="Clean up">
-      <div class="ghead"><span class="lab"><b>03</b> Clean up</span><Switch checked={!!v('voice.dictation_cleanup')} label="Fix grammar and punctuation" onchange={(on) => set('voice.dictation_cleanup', on)} /></div>
-      <p class="gh">{v('voice.dictation_cleanup') ? 'Fixed before typing: “comma” and “full stop” become symbols, number words become digits, “um” goes, “no, actually …” keeps the correction, and capitals are added.' : 'Typed exactly as it was heard.'}</p>
-      {@render toggle('general.paste_dictation', 'Type it where the cursor is', 'Off: it is only transcribed and kept in Insights.')}
-      {@render toggle('general.paste_tag', 'Add “[typed using project OASIS]”', 'After each typed dictation.')}
-      {@render pick('voice.capture_mode', 'A recording becomes', 'Typed where the cursor is, run as a command, or decided by what you say.')}
+      <Head title="Clean up" text={v('voice.dictation_cleanup') ? 'Punctuation, digits and capitals added; “um” removed.' : 'Typed exactly as it was heard.'}>
+        <Switch checked={!!v('voice.dictation_cleanup')} label="Fix grammar and punctuation" onchange={(on) => set('voice.dictation_cleanup', on)} />
+      </Head>
+      {@render toggle('general.paste_dictation', 'Type it where the cursor is', 'Off: only kept in Insights.', 'text')}
+      {@render pick('voice.capture_mode', 'A recording becomes', 'Text, a command, or decided by what you say.', 'branch')}
     </section>
 
     <section class="group" aria-label="Polish">
-      <div class="ghead"><span class="lab"><b>04</b> Polish</span><Switch checked={!!v('voice.polish')} label="Polish with the local model" onchange={(on) => set('voice.polish', on)} /></div>
-      <p class="gh">{v('voice.polish') ? `S1-mini tidies each sentence on the graphics card while you talk. Anything not ready ${v('voice.polish_wait_ms')} ms after you let go is typed as the rules wrote it.` : 'Off: the rules alone clean the text, and the model is not kept in graphics memory.'} Needs the Quality model set (a graphics card); on other computers this does nothing.</p>
+      <Head title="Polish" text={v('voice.polish') ? 'A local model smooths each sentence. Needs a graphics card.' : 'Off: the rules alone clean the text.'}>
+        <Switch checked={!!v('voice.polish')} label="Polish with the local model" onchange={(on) => set('voice.polish', on)} />
+      </Head>
       <div class="rows" class:off={!v('voice.polish')}>
-        {@render pick('voice.polish_tone', 'Tone', 'From casual to formal.')}
-        {@render pick('voice.polish_structure', 'Structure', 'Plain sentences, or lists where you list things.')}
-        {@render pick('voice.polish_context', 'Context', 'Automatic writes for email in a mail program and plainly elsewhere.')}
-        {@render pick('voice.polish_wait_ms', 'Wait limit', 'While plugged in. On battery it waits 1.5× as long, 2× with Battery Saver.')}
+        {@render pick('voice.polish_tone', 'Tone', 'Casual to formal.', 'smile')}
+        {@render pick('voice.polish_structure', 'Structure', 'Sentences, or lists.', 'list')}
+        {@render pick('voice.polish_context', 'Context', 'Email style in a mail program.', 'mail')}
+        {@render pick('voice.polish_wait_ms', 'Wait limit', 'Longer on battery.', 'clock')}
       </div>
     </section>
 
     <section class="group" aria-label="Voice commands">
-      <div class="ghead"><span class="lab">Voice commands</span>{#if saved}<span class="saved mono" role="status">{saved}</span>{/if}</div>
-      {@render pick('voice.approval_mode', 'Ask before running')}
-      {@render toggle('voice.allow_launch_app', 'Let voice open apps')}
-      {@render toggle('voice.allow_type_text', 'Let voice type text')}
-      {@render toggle('voice.edit_commands', 'Editing commands')}
-      {@render pick('preferences.browser', 'Preferred browser', 'Opens a spoken search when no browser is open.')}
+      <Head title="Voice commands" text="Say what to do, and OASIS does it.">
+        {#if saved}<span class="saved mono" role="status">{saved}</span>{/if}
+      </Head>
+      {@render pick('voice.approval_mode', 'Ask before running', '', 'shield')}
+      {@render toggle('voice.allow_launch_app', 'Let voice open apps', '', 'apps')}
+      {@render toggle('voice.allow_type_text', 'Let voice type text', '', 'keyboard')}
+      {@render toggle('voice.edit_commands', 'Editing commands', '', 'scissors')}
+      {@render pick('preferences.browser', 'Preferred browser', 'For a spoken search.', 'globe')}
       {#if fields['voice.match_threshold']}
         <div class="srow">
-          <div class="rtext"><div class="rname">How exact a command must be</div><div class="hint">Lower catches more of what you say, higher runs only close matches.</div></div>
+          <Ico n="target" />
+          <div class="rtext"><div class="rname">How exact a command must be</div><div class="hint">Lower catches more, higher only close matches.</div></div>
           <div class="ctl"><input type="range" aria-label="How exact a command must be" min={fields['voice.match_threshold'].min} max={fields['voice.match_threshold'].max} step={fields['voice.match_threshold'].step} value={v('voice.match_threshold')}
             onchange={(e) => set('voice.match_threshold', Number(e.currentTarget.value))} /><span class="num mono">{Number(v('voice.match_threshold')).toFixed(2)}</span></div>
         </div>
@@ -401,9 +411,9 @@
     </section>
 
     <section class="group" aria-label="Try voice commands">
-      <div class="ghead"><span class="lab">Try voice commands</span>
-        <button type="button" class="quiet" aria-expanded={tryOpen} aria-controls="try-body" onclick={() => (tryOpen = !tryOpen)}>{tryOpen ? 'Close' : 'Open'}</button></div>
-      <p class="gh">A practice box and a short checklist: select all, copy, paste, undo and save, said out loud.</p>
+      <Head title="Try voice commands" text="Practise select all, copy, paste, undo and save, out loud.">
+        <button type="button" class="quiet" aria-expanded={tryOpen} aria-controls="try-body" onclick={() => (tryOpen = !tryOpen)}>{tryOpen ? 'Close' : 'Open'}</button>
+      </Head>
       {#if tryOpen}<div id="try-body" class="trybody"><TryCommands /></div>{/if}
     </section>
 
@@ -473,24 +483,20 @@
   .pop { position: absolute; top: calc(100% + 8px); right: 0; z-index: 30; width: 300px; max-width: 90vw; display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface); box-shadow: 0 14px 36px var(--shadow); }
   .pop .more { align-self: flex-end; margin-top: 4px; padding: 4px 2px; border: 0; background: transparent; color: var(--ink); font-size: 12px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
   .tiles { display: flex; gap: 6px; }
-  .tile { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px 0 6px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--muted);
+  .tile { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px 0 6px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); box-shadow: 0 3px 0 var(--line);
     transition: background-color .18s var(--ease), color .18s var(--ease), border-color .18s var(--ease), box-shadow .18s var(--ease); }
   .tile .num { width: 28px; height: 28px; flex: none; border-radius: 7px; display: grid; place-items: center; font-size: 11px; background: var(--hair); color: var(--muted); }
-  .tile.on { border-color: var(--e); background: var(--surface); color: var(--ink); box-shadow: 0 2px 0 var(--e); }
+  .tile.on { border-color: var(--e); background: color-mix(in srgb, var(--c) 12%, var(--surface)); color: var(--ink); box-shadow: 0 3px 0 var(--e); }
   .tile.on .num { background: var(--c); color: #fff; }
   .tile:not(.on):hover { border-color: var(--muted); color: var(--ink); }
   .chord { display: flex; align-items: center; gap: 3px; white-space: nowrap; }
   .chord kbd { font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 5px; border: 1px solid var(--line); background: var(--sunk); color: inherit; }
   .chord .pl { font-size: 10px; color: var(--muted); }
-  .voice.main > .problem, .voice.main > .saved { grid-column: 1 / -1; }
+  .voice.main > .problem { grid-column: 1 / -1; }
   /* Settings: stacked groups, a small heading and rows divided by hairlines, as in Pad & keys */
   .voice.set { display: flex; flex-direction: column; gap: 14px; min-width: 0; max-width: 860px; }
   .group { padding: 4px 20px 6px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface); box-shadow: 0 1px 3px var(--shadow); }
-  .ghead { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding-top: 6px; }
-  .ghead .lab { font-weight: 600; letter-spacing: .12em; }
-  .gh { margin: 0 0 6px; font-size: 13px; line-height: 1.5; color: var(--muted); max-width: 72ch; }
   .srow { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px 24px; padding: 13px 0; border-top: 1px solid var(--hair); }
-  .ghead + :global(.srow), .gh + :global(.srow), .rows > :global(.srow:first-child) { border-top: 0; }
   .rname { font-size: 14px; font-weight: 600; color: var(--ink); }
   .srow .hint { margin-top: 2px; }
   .ctl { display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-width: 0; }
@@ -507,7 +513,6 @@
   .vwrap.inline { container-type: normal; flex: none; min-height: 0; }
   .mono { font-family: var(--mono); }
   .lab { font: 500 11px/1.3 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
-  .lab b { color: var(--signal-ink); font-weight: 500; margin-right: 6px; }
   .hint { margin: 0; font-size: 12px; line-height: 1.45; color: var(--muted); }
   .pad { padding: 12px 4px; }
   button:disabled { opacity: .4; cursor: default; }
@@ -536,7 +541,6 @@
   .add1 .main { flex: 1 1 140px; min-width: 0; }
   .add1 .more { flex: none; height: 36px; padding: 0 14px; font-size: 13px; }
   .add1 .addbtns { grid-column: auto; flex: none; }
-  .sec { font-size: 13px; opacity: .9; }
   .more { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; border: 1px dashed var(--line); border-radius: 999px; background: transparent; padding: 5px 12px; color: var(--muted); font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; }
   .more b { font-size: 14px; line-height: 1; font-weight: 500; }
   .more:hover, .more:focus-visible { background: var(--sunk); color: var(--ink); border-color: var(--muted); }

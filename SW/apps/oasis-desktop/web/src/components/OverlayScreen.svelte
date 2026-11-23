@@ -1,4 +1,6 @@
 <script>
+  import Head from './Head.svelte';
+  import Ico from './Ico.svelte';
   import { status } from '../status.svelte.js';
   import Switch from './Switch.svelte';
 
@@ -70,7 +72,7 @@
 {#snippet colors(/** @type {string[]} */ ids)}
   {#each ids as id}
     {#if fields[id]}
-      <div class="srow"><div class="rtext"><div class="rname">{fields[id].label}</div></div>
+      <div class="srow"><Ico n="palette" /><div class="rtext"><div class="rname">{fields[id].label}</div></div>
         <span class="sw" role="radiogroup" aria-label={fields[id].label}>
           {#each fields[id].options as o}<button type="button" role="radio" aria-checked={o.value === v(id)} class:on={o.value === v(id)} title={o.label} aria-label={o.label} style="--c: {o.value}" onclick={() => set(id, o.value)}></button>{/each}
         </span></div>
@@ -81,7 +83,7 @@
 {#snippet sliders(/** @type {string[]} */ ids)}
   {#each ids as id}
     {#if fields[id]}
-      <div class="srow"><div class="rtext"><div class="rname">{fields[id].label}</div></div>
+      <div class="srow"><Ico n="sliders" /><div class="rtext"><div class="rname">{fields[id].label}</div></div>
         <div class="ctl"><input type="range" aria-label={fields[id].label} min={fields[id].min} max={fields[id].max} step={fields[id].step} value={v(id)} onchange={(e) => set(id, Number(e.currentTarget.value))} /><span class="val mono">{shown(fields[id])}</span></div></div>
     {/if}
   {/each}
@@ -93,15 +95,15 @@
   {:else if loaded && look}
   <div class="ov" inert={locked}>
     <section class="group" aria-label="Arrangement">
-      <div class="ghead">
-        <span class="lab">Arrangement</span>
+      <Head title="Arrangement" text="Where the three bars sit on your screen.">
         <span class="acts">
           {#if look.moved && !moving}<button class="pillbtn" onclick={() => set('overlay.dock', dock)} title="Put it back on its edge">Snap back to edge</button>{/if}
           <button class="pillbtn" class:dark={moving} onclick={toggleMove}>{moving ? 'Done moving' : 'Move overlay'}</button>
         </span>
-      </div>
+      </Head>
       <div class="srow">
-        <div class="rtext"><div class="rname">Layout</div><div class="hint">Three bars down an edge, or in a row.</div></div>
+        <Ico n="layout" />
+        <div class="rtext"><div class="rname">Layout</div></div>
         <div class="seg" role="radiogroup" aria-label="Layout">
           <button type="button" role="radio" aria-checked={vertical} class:on={vertical} onclick={() => arrange(true)}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="2.5" height="4" rx="1.2" /><rect x="5" y="10" width="2.5" height="4" rx="1.2" /><rect x="5" y="16" width="2.5" height="4" rx="1.2" /><rect x="10" y="4.5" width="10" height="3" rx="1.5" /><rect x="10" y="10.5" width="10" height="3" rx="1.5" /><rect x="10" y="16.5" width="10" height="3" rx="1.5" /></svg>Vertical</button>
@@ -110,6 +112,7 @@
         </div>
       </div>
       <div class="srow">
+        <Ico n="dock" />
         <div class="rtext"><div class="rname">{vertical ? 'Side of the screen' : 'Edge, centred'}</div></div>
         <div class="seg" role="radiogroup" aria-label="Where on the screen">
           {#each vertical ? [['left', 'Left'], ['right', 'Right']] : [['top', 'Top'], ['bottom', 'Bottom']] as [d, t]}
@@ -118,6 +121,7 @@
         </div>
       </div>
       <div class="srow">
+        <Ico n="eye" />
         <div class="rtext"><div class="rname">When not in use</div><div class="hint">{idle.about}{moving ? ' Drag the overlay on your screen now, then press Done moving.' : ''}</div></div>
         <div class="seg" role="radiogroup" aria-label="When not in use">
           {#each IDLE as i}<button type="button" role="radio" aria-checked={idle.value === i.value} class:on={idle.value === i.value} onclick={() => set('overlay.idle', i.value)}>{i.name}</button>{/each}
@@ -146,15 +150,15 @@
     </section>
 
     <section class="group" aria-label="Bars">
-      <div class="ghead"><span class="lab">Bars</span><button class="pillbtn" onclick={resetLook} title="Colours and sizes back to the defaults; where it sits is kept">Reset look</button></div>
+      <Head title="Bars" text="Colour and size of each bar."><button class="pillbtn" onclick={resetLook} title="Colours and sizes back to the defaults; where it sits is kept">Reset look</button></Head>
       {@render colors(BAR_COLORS)}
       {@render sliders(BAR_NUMBERS)}
     </section>
 
     <section class="group" aria-label="Labels">
-      <div class="ghead"><span class="lab">Labels</span></div>
+      <Head title="Labels" text="The names shown beside the bars." />
       {#if fields['general.show_labels']}
-        <div class="srow"><div class="rtext"><div class="rname">Show labels on the first tap</div><div class="hint">The second tap runs the button.</div></div>
+        <div class="srow"><Ico n="tag" /><div class="rtext"><div class="rname">Show labels on the first tap</div><div class="hint">The second tap runs the button.</div></div>
           <Switch checked={!!v('general.show_labels')} label="Show labels on the first tap" onchange={(on) => set('general.show_labels', on)} /></div>
       {/if}
       {@render colors(LABEL_COLORS)}

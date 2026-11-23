@@ -1,6 +1,7 @@
 // @ts-nocheck: the old window script, untyped; restyled and typed screen by screen as each is rebuilt.
 // The old window's script, moved here as it was; the Profiles editor is gone (rebuilt in step 3.3). Changed: tabs (the shell navigates), and the
 // pad, Live and banner controls (the shell draws them). Loaded after the shell's markup exists.
+import { FIELD_ICONS, headNode, icoNode } from '../settingsArt.js';
   const { invoke } = window.__TAURI__.core;
   const { listen } = window.__TAURI__.event;
   const $ = (id) => document.getElementById(id);
@@ -28,7 +29,7 @@
     // Each section of fields goes to its place in the Settings pop-up (SettingsDialog.svelte).
     const hosts = { general: 'settings-general', pad: 'settings-gestures', youtube: 'settings-gestures', meetings: 'settings-connections' };
     // Shown on the Voice screen instead; the browser link joins the YouTube gestures it serves.
-    const onVoiceScreen = new Set(['pad.sounds', 'general.paste_dictation', 'general.paste_tag', 'preferences.browser']);
+    const onVoiceScreen = new Set(['pad.sounds', 'general.paste_dictation', 'preferences.browser']);
     const toYoutube = new Set(['general.bridge_enabled', 'general.bridge_port']);
     for (const s of reply.sections) s.fields = s.fields.filter((f) => !onVoiceScreen.has(f.id));
     const general = reply.sections.find((s) => s.id === 'general');
@@ -43,13 +44,7 @@
       if (!host) continue; // Voice and Overlay have their own screens.
       const card = document.createElement('section');
       card.className = 'card';
-      const title = document.createElement('div');
-      title.className = 'label';
-      title.textContent = section.title;
-      const hint = document.createElement('div');
-      hint.className = 'hint';
-      hint.textContent = section.hint;
-      card.append(title, hint);
+      card.append(headNode(section.title, section.hint));
       for (const field of section.fields) card.append(settingRow(field));
       host.append(card);
     }
@@ -336,6 +331,7 @@
   function settingRow(field) {
     const row = document.createElement('div');
     row.className = 'setting';
+    if (FIELD_ICONS[field.id]) row.append(icoNode(FIELD_ICONS[field.id]));
     const text = document.createElement('div');
     text.className = 'text';
     const name = document.createElement('div');

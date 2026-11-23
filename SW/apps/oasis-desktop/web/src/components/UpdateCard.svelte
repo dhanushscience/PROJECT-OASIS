@@ -1,4 +1,6 @@
 <script>
+  import Head from './Head.svelte';
+  import Ico from './Ico.svelte';
   import { onMount } from 'svelte';
 
   const tauri = window.__TAURI__;
@@ -28,8 +30,9 @@
 </script>
 
 <section class="group" aria-label="Updates">
-  <div class="ghead"><span class="lab">Updates</span><span class="chip">Version {info.current}</span></div>
+  <Head title="Updates"><span class="chip">Version {info.current}</span></Head>
   <div class="srow">
+    <Ico n="download" />
     <div class="rtext">
       <div class="rname">{info.available ? `OASIS ${info.available} is available` : info.error ? 'Could not check for updates' : info.checking ? 'Checking for updates…' : 'OASIS is up to date'}</div>
       <div class="hint" role="status">{line}</div>

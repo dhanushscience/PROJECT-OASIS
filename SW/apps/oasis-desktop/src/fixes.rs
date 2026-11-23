@@ -33,13 +33,19 @@ pub fn watch(app: AppHandle, dictated: String) {
     let _ = thread::Builder::new()
         .name("oasis-fixes".into())
         .spawn(move || {
+            let mut counted = false;
             fixes_core::run(
                 &dictated,
                 fixes_core::REAL,
                 &|| WATCH.load(Ordering::SeqCst) == ticket,
                 &read,
                 &oasis_win::desktop::foreground,
-                &mut |fixes| offer(&app, fixes),
+                &mut |fixes| {
+                    if !std::mem::replace(&mut counted, true) {
+                        crate::analytics::count(oasis_engine::stats::Metric::Corrections, 1);
+                    }
+                    offer(&app, fixes)
+                },
                 &note,
             );
         });

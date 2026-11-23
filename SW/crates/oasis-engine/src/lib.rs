@@ -30,6 +30,8 @@ pub mod quick_launch;
 pub mod reminders;
 pub mod self_check;
 pub mod spotify;
+pub mod stats;
+pub mod telemetry;
 pub mod use_counts;
 pub mod voice;
 

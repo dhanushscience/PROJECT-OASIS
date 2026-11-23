@@ -1,4 +1,6 @@
 <script>
+  import Head from './Head.svelte';
+  import Ico from './Ico.svelte';
   import { models, modelsCall, etaText, setName, upgradeText } from '../models.svelte.js';
   import { sure } from '../confirm.svelte.js';
 
@@ -23,6 +25,16 @@
     }
   });
 
+  /** What each set does to your voice, for the pictures: words wrong per 100 (VOICE_BENCH.md §3: 4.6% and 0.9%),
+      where it runs, and whether S1-mini polishes the text. Balanced and Quality share the speech model. */
+  const PROFILE = /** @type {Record<string, { model: string, wrong: number, runs: string, polish: boolean }>} */ ({
+    light: { model: 'Small model', wrong: 5, runs: 'Processor', polish: false },
+    balanced: { model: 'Accurate model', wrong: 1, runs: 'Processor', polish: false },
+    quality: { model: 'Accurate model', wrong: 1, runs: 'Processor + graphics card', polish: true },
+  });
+  const cur = $derived(info?.target ? PROFILE[info.target] : undefined);
+  const curSet = $derived(info?.sets.find((x) => x.id === info?.target));
+
   /** @param {string} choice */
   function choose(choice) {
     if (info && choice !== info.choice) modelsCall('models_choose', { choice });
@@ -32,9 +44,9 @@
   }
 </script>
 
+<!-- what is in use first, then the choice, then upkeep; the PC facts behind the choice are not shown -->
 <section class="group" id="voice-models" aria-labelledby="models-head">
-  <div class="ghead">
-    <span class="lab" id="models-head">Status</span>
+  <Head id="models-head" title="In use">
     {#if busy}
       <button class="pillbtn" onclick={() => modelsCall('models_pause')}>Pause</button>
     {:else if info?.phase === 'paused' || info?.phase === 'offline' || info?.phase === 'failed'}
@@ -42,49 +54,54 @@
     {:else if info?.phase === 'metered'}
       <button class="pillbtn dark" onclick={() => modelsCall('models_download_anyway')}>Download anyway</button>
     {/if}
+  </Head>
+  <div class="inuse">
+    <div class="who">
+      <div class="big">{setName(info?.target) || 'None'}</div>
+      <div class="hint" role="status">{line}</div>
+      {#if curSet}<p class="what">{curSet.what}</p>{/if}
+    </div>
+    {#if cur}
+      <div class="how">
+        <!-- what happens to a recording with this set: the steps it goes through, left to right -->
+        <ol class="flow" aria-label="What happens to your voice">
+          <li><Ico n="mic" /><span>You speak</span></li>
+          <li class="lit"><Ico n="waves" /><span>{cur.model}</span></li>
+          <li class:lit={cur.polish} class:off={!cur.polish}><Ico n="sparkle" /><span>{cur.polish ? 'Polished' : 'No polish'}</span></li>
+          <li><Ico n="text" /><span>Typed</span></li>
+        </ol>
+        <div class="miss">
+          <span class="dots" aria-hidden="true">{#each { length: 100 } as _, i}<i class:bad={i < cur.wrong}></i>{/each}</span>
+          <span class="hint">About {cur.wrong} in 100 words wrong</span>
+        </div>
+        <div class="facts"><span class="chip"><Ico n="chip" />{cur.runs}</span>{#if curSet}<span class="chip">{curSet.size_mb} MB</span>{/if}</div>
+      </div>
+    {/if}
   </div>
-  <p class="gh" role="status">{line}</p>
   {#if busy || info?.phase === 'paused'}
     <div class="meter" role="progressbar" aria-label="Voice model download" aria-valuemin="0" aria-valuemax="100" aria-valuenow={percent}><span style="width:{percent}%"></span></div>
   {/if}
   {#if info?.upgrade}
     <!-- Basic in use on a PC that can run Balanced: one click switches, the same way as choosing Balanced below -->
     <div class="srow">
+      <Ico n="up" />
       <div class="rtext"><div class="rname">Basic makes more mistakes</div>
         <div class="hint">This PC can run Balanced, which gets about five times fewer words wrong.</div></div>
       <button class="pillbtn dark" onclick={() => choose('balanced')}>{upgradeText(info)}</button>
     </div>
   {/if}
-  {#if info}
-    <div class="srow">
-      <div class="rtext"><div class="rname">Check this PC again</div><div class="hint">Run the speed check again, for example after a driver or hardware change.</div></div>
-      <button class="pillbtn" onclick={() => modelsCall('models_check_again')}>Check again</button>
-    </div>
-    <div class="srow">
-      <div class="rtext"><div class="rname">Remove downloaded models</div>
-        <div class="hint">Frees disk space. You can download a set again at any time.</div></div>
-      <button class="pillbtn" onclick={remove} disabled={!info.sets.some((s) => s.installed)}>Remove…</button>
-    </div>
-  {/if}
 </section>
 
 {#if info}
-  <section class="group" aria-label="This PC">
-    <div class="ghead"><span class="lab">This PC</span></div>
-    <ul class="facts">{#each info.pc as fact}<li class="chip">{fact}</li>{/each}</ul>
-    <p class="gh">{info.reason}</p>
-    {#if info.check}<p class="gh check" class:slow={info.check_slow}><strong>Test on this PC:</strong> {info.check}</p>{/if}
-  </section>
-
   <section class="group" aria-label="Model set">
-    <div class="ghead"><span class="lab">Model set</span></div>
+    <Head title="Change model" text="Faster or more accurate." />
     <div class="sets" role="radiogroup" aria-label="Model set">
       <label class="set" class:on={info.choice === 'auto'}>
         <input type="radio" name="model-set" value="auto" checked={info.choice === 'auto'} onchange={() => choose('auto')} />
         <span class="radio" aria-hidden="true"></span>
         <span class="body">
           <span class="name">Automatic{info.recommended ? ` · ${setName(info.recommended)}` : ''}<span class="tag">Recommended</span></span>
-          <span class="desc">The set this PC suits, from the check above.</span>
+          <span class="desc">The set this PC suits, from a speed check.</span>
         </span>
       </label>
       {#each info.sets as set (set.id)}
@@ -94,21 +111,60 @@
           <span class="body">
             <span class="name">{set.label}<span class="size">{set.size_mb} MB</span>{#if set.installed}<span class="tag dl">Downloaded</span>{/if}</span>
             <span class="desc">{set.what}</span>
+            {#if PROFILE[set.id]}
+              {@const f = PROFILE[set.id]}
+              <span class="mini"><span class="chip">≈{f.wrong} in 100 wrong</span><span class="chip">{f.runs}</span>{#if f.polish}<span class="chip">Polish</span>{/if}</span>
+            {/if}
             {#if !set.suits}<span class="warn">This PC is below what this set needs. It still works, but may be slow.</span>{/if}
           </span>
         </label>
       {/each}
     </div>
   </section>
+
+  <section class="group" aria-label="Manage models">
+    <Head title="Manage" />
+    <div class="srow">
+      <Ico n="gauge" />
+      <div class="rtext"><div class="rname">Check this PC again</div><div class="hint">After a driver or hardware change.</div></div>
+      <button class="pillbtn" onclick={() => modelsCall('models_check_again')}>Check again</button>
+    </div>
+    <div class="srow">
+      <Ico n="trash" />
+      <div class="rtext"><div class="rname">Remove downloaded models</div>
+        <div class="hint">Frees disk space. Download again any time.</div></div>
+      <button class="pillbtn" onclick={remove} disabled={!info.sets.some((s) => s.installed)}>Remove…</button>
+    </div>
+  </section>
 {/if}
 
 <style>
+  /* in use: the name and what it is on the left, how it treats your voice on the right */
+  .inuse { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 20px 28px; align-items: start; padding: 4px 0 16px; }
+  .big { font-size: 24px; font-weight: 700; letter-spacing: -.02em; color: var(--ink); }
+  .what { margin: 10px 0 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
+  .how { display: flex; flex-direction: column; gap: 14px; padding: 14px 16px; border-radius: var(--r-row); background: var(--sunk); }
+  .flow { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .flow li { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; font-size: 11px; line-height: 1.25; color: var(--muted); }
+  .flow li + li::before { content: ''; position: absolute; top: 16px; right: calc(50% + 22px); width: calc(100% - 38px); border-top: 1.5px dashed var(--line); }
+  .flow :global(.ico) { background: var(--surface); box-shadow: 0 2px 0 var(--line); }
+  .flow li.lit { color: var(--ink); font-weight: 600; }
+  .flow li.lit :global(.ico) { background: color-mix(in srgb, var(--signal) 14%, var(--surface)); color: var(--signal-ink); box-shadow: 0 2px 0 color-mix(in srgb, var(--signal) 55%, var(--line)); }
+  .flow li.off { opacity: .45; }
+  .flow li.off span { text-decoration: line-through; }
+  .miss { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .dots { display: grid; grid-template-columns: repeat(25, 5px); gap: 3px; }
+  .dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--line); }
+  .dots i.bad { background: var(--signal); }
+  .facts { display: flex; gap: 6px; flex-wrap: wrap; }
+  .facts .chip { gap: 6px; }
+  .facts :global(.ico) { width: 16px; height: 16px; background: none; }
+  .facts :global(.ico svg) { width: 14px; height: 14px; }
+  .mini { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .mini .chip { height: 22px; font-size: 11px; }
+  @media (max-width: 760px) { .inuse { grid-template-columns: minmax(0, 1fr); } }
   .meter { height: 6px; margin: 4px 0 12px; border-radius: 3px; background: var(--hair); overflow: hidden; }
   .meter span { display: block; height: 100%; background: var(--signal); transition: width .25s var(--ease); }
-  .facts { margin: 0 0 12px; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
-  .check { color: var(--ink); }
-  .check.slow { color: var(--signal-ink); }
-  .gh:last-child { margin-bottom: 14px; }
 
   /* the sets: a list; the chosen one is lifted with a dark ring, and its radio fills in orange */
   .sets { display: flex; flex-direction: column; margin: 0 -8px 8px; }

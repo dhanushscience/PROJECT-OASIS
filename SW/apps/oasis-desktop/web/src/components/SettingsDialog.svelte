@@ -7,6 +7,9 @@
   import OverlayScreen from './OverlayScreen.svelte';
   import AppearanceCard from './AppearanceCard.svelte';
   import UpdateCard from './UpdateCard.svelte';
+  import PrivacyCard from './PrivacyCard.svelte';
+  import Head from './Head.svelte';
+  import Ico from './Ico.svelte';
   import { sure } from '../confirm.svelte.js';
   import { send as guideSend } from '../guide/onboarding.svelte.js';
   import '../settings.css';
@@ -28,6 +31,7 @@
     { id: 'connections', soon: true, name: 'Connections', about: 'Your calendar, Spotify and the browser extension.', icon: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1' },
     { id: 'general', name: 'General', about: 'Starting with Windows, button labels and scripts.', icon: 'M4 7h10M18 7h2M4 17h2M10 17h10M16 4v6M8 14v6' },
     { id: 'updates', name: 'Updates & data', about: 'New versions of OASIS, and reading your profiles from the file again.', icon: 'M12 4v11M7 10l5 5 5-5M5 20h14' },
+    { id: 'privacy', name: 'Privacy', about: 'What OASIS may send to help improve it. All off until you switch it on.', icon: 'M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z' },
     { id: 'activity', name: 'Activity', about: 'The last button press and what OASIS did recently.', icon: 'M3 12h4l3-8 4 16 3-8h4' },
   ];
 
@@ -207,9 +211,9 @@
             <div id="settings-connections" class="groups"></div>
             <div id="settings-accounts" class="groups"></div>
             <section class="card" id="bridgeCard">
-              <div class="label">Browser extension</div>
-              <div class="hint">For YouTube gestures and ad skipping. Load it once: open your browser’s extensions page, turn on Developer mode, choose Load unpacked, and pick the folder this button opens.</div>
+              <Head title="Browser extension" text="Load it once: extensions page, Developer mode, Load unpacked, then pick this folder." />
               <div class="srow">
+                <Ico n="link" />
                 <div class="rtext"><div class="rname">Link to the browser</div><div id="bridgeHint" class="hint"></div><div id="youtubeText" class="hint"></div></div>
                 <div class="ctl"><span id="bridgeText" class="state">Off</span><button id="openExtension" class="action quiet">Open extension folder</button></div>
               </div>
@@ -222,22 +226,25 @@
 
           <div class="pane legacy" bind:this={panes.general} hidden={current.id !== 'general'}>
             <section class="card" id="systemCard">
-              <div class="label">Windows</div>
+              <Head title="Windows" text="How OASIS starts and what it may control." />
               <div class="srow">
-                <div class="rtext"><div class="rname">Start with Windows</div><div class="hint">OASIS starts hidden in the tray when you sign in.</div></div>
+                <Ico n="power" />
+                <div class="rtext"><div class="rname">Start with Windows</div><div class="hint">Starts hidden in the tray.</div></div>
                 <div class="ctl"><label class="switch" aria-label="Start with Windows"><input id="autostart" type="checkbox"><span class="track"></span></label></div>
               </div>
               <div class="srow">
-                <div class="rtext"><div class="rname">Run as administrator</div><div class="hint">So OASIS can control windows that run as administrator. Windows asks for approval once.</div><div id="adminText" class="hint"></div></div>
+                <Ico n="shield" />
+                <div class="rtext"><div class="rname">Run as administrator</div><div class="hint">To control admin windows. Windows asks once.</div><div id="adminText" class="hint"></div></div>
                 <div class="ctl"><label class="switch" aria-label="Run as administrator"><input id="admin" type="checkbox"><span class="track"></span></label></div>
               </div>
               <div class="tail"><div id="systemMsg" class="msg" role="status"></div><button id="restart" class="action quiet" hidden>Restart OASIS</button></div>
             </section>
             <div id="settings-general" class="groups"></div>
             <section class="card">
-              <div class="label">Guide</div>
+              <Head title="Guide" />
               <div class="srow">
-                <div class="rtext"><div class="rname">Getting Started</div><div class="hint">Mr. Science shows you around again. Your buttons and settings are kept.</div></div>
+                <Ico n="compass" />
+                <div class="rtext"><div class="rname">Getting Started</div><div class="hint">Mr. Science shows you around again. Nothing is reset.</div></div>
                 <div class="ctl"><button class="action quiet" onclick={() => { closeSettings(); guideSend('replay'); }}>Show me again</button></div>
               </div>
             </section>
@@ -246,29 +253,30 @@
           <div class="pane legacy" bind:this={panes.updates} hidden={current.id !== 'updates'}>
             <UpdateCard />
             <section class="card">
-              <div class="label">Data</div>
+              <Head title="Data" text="Your profiles and recordings on this PC." />
               <div class="srow">
-                <div class="rtext"><div class="rname">Reload profiles</div><div class="hint">Read profiles.json again, for example after the older OASIS app changed it.</div><div id="reloadMsg" class="msg" role="status"></div></div>
+                <Ico n="refresh" />
+                <div class="rtext"><div class="rname">Reload profiles</div><div class="hint">Read profiles.json again.</div><div id="reloadMsg" class="msg" role="status"></div></div>
                 <div class="ctl"><button id="reload" class="action quiet">Reload from file</button></div>
               </div>
-            </section>
-            <section class="card">
-              <div class="label">Data</div>
               <div class="srow">
-                <div class="rtext"><div class="rname">Delete all data</div><div class="hint">Deletes every dictation recording and its text from Insights. This cannot be undone.</div><div class="msg" class:ok={wipe.ok} class:bad={!wipe.ok} role="status">{wipe.msg}</div></div>
+                <Ico n="trash" />
+                <div class="rtext"><div class="rname">Delete all data</div><div class="hint">Every recording and its text in Insights. Cannot be undone.</div><div class="msg" class:ok={wipe.ok} class:bad={!wipe.ok} role="status">{wipe.msg}</div></div>
                 <div class="ctl"><button class="action quiet danger" onclick={deleteAll}>Delete all data</button></div>
               </div>
             </section>
           </div>
 
+          <div class="pane legacy" bind:this={panes.privacy} hidden={current.id !== 'privacy'}><PrivacyCard /></div>
+
           <div class="pane legacy" bind:this={panes.activity} hidden={current.id !== 'activity'}>
             <section class="card">
-              <div class="label">Last press</div>
+              <Head title="Last press" />
               <div id="last" class="big">Nothing yet</div>
               <div id="lastDetail" class="hint"></div>
             </section>
             <section class="card">
-              <div class="label">Recent activity</div>
+              <Head title="Recent activity" />
               <div id="empty" class="empty">Press an OASIS interface button to see what it would do.</div>
               <ul id="feed"></ul>
             </section>

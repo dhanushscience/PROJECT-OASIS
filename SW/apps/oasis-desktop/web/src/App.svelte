@@ -8,6 +8,7 @@
   import SettingsDialog from './components/SettingsDialog.svelte';
   import ConfirmDialog from './components/ConfirmDialog.svelte';
   import UpdatePrompt from './components/UpdatePrompt.svelte';
+  import PrivacyAsk from './components/PrivacyAsk.svelte';
   import { settingsUi, openSettings } from './settings.svelte.js';
   import ModelsStrip from './components/ModelsStrip.svelte';
   import Guide from './components/Guide.svelte';
@@ -128,6 +129,7 @@
 <SettingsDialog />
 <ConfirmDialog />
 <UpdatePrompt />
+<PrivacyAsk />
 
 <style>
   .window { width: 100vw; height: 100dvh; padding: 12px 28px 28px 12px; display: flex; gap: 12px; }

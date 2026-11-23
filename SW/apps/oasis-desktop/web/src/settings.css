@@ -10,7 +10,6 @@
 .dialog .ghead .lab { font: 600 11px/1.3 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 .dialog .gh { margin: 0 0 6px; font-size: 13px; line-height: 1.5; color: var(--muted); max-width: 72ch; }
 .dialog .srow { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px 24px; padding: 13px 0; border-top: 1px solid var(--hair); }
-.dialog .srow:has(> .ico) { grid-template-columns: 36px minmax(0, 1fr) auto; column-gap: 14px; }
 .dialog .ghead + .srow, .dialog .gh + .srow { border-top: 0; }
 .dialog .rname { font-size: 14px; font-weight: 600; color: var(--ink); }
 .dialog .srow .hint { margin: 2px 0 0; font-size: 12px; line-height: 1.4; color: var(--muted); }
@@ -32,7 +31,24 @@
 .dialog .chip { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: var(--r-pill); background: var(--hair); color: var(--ink); font: 500 12px var(--mono); }
 .dialog .chip.dark { background: var(--ink); color: var(--inv); font-weight: 600; letter-spacing: .04em; }
 
+/* ---- a group's heading (Head.svelte, legacy headNode): a numbered title and one line on the left,
+   then its own switch or buttons */
+.dialog .pane { counter-reset: grp; }
+.dialog .ghead.hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px 22px; padding: 14px 0 10px; min-height: 0; }
+.dialog .ghead.hero .lab { display: block; font: 600 13px/1.3 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink); }
+.dialog .ghead.hero .lab::before { counter-increment: grp; content: counter(grp, decimal-leading-zero); margin-right: 12px; color: var(--signal-ink); }
+.dialog .ghead.hero .gh { margin: 6px 0 0; }
+.dialog .hctl { display: flex; align-items: center; gap: 8px; }
+.dialog .ghead.hero + .srow, .dialog .ghead.hero + .setting, .dialog .ghead.hero + .rows > .srow:first-child { border-top: 0; }
+
+/* ---- a row's icon: a small tile on the left, so a list of settings can be scanned without reading */
+.dialog .pane .srow:has(> .ico), .dialog .pane .setting:has(> .ico) { grid-template-columns: 32px minmax(0, 1fr) auto; column-gap: 14px; }
+.dialog .ico { width: 32px; height: 32px; flex: none; display: grid; place-items: center; border-radius: 9px; background: var(--hair); color: var(--ink); }
+.dialog .ico svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
 @media (max-width: 760px) {
   .dialog .srow { grid-template-columns: minmax(0, 1fr); }
   .dialog .ctl { justify-content: flex-start; }
+    .dialog .pane .srow:has(> .ico), .dialog .pane .setting:has(> .ico) { grid-template-columns: 32px minmax(0, 1fr); }
+  .dialog .pane .srow:has(> .ico) > :last-child:not(.rtext), .dialog .pane .setting:has(> .ico) > .control { grid-column: 2; }
 }
