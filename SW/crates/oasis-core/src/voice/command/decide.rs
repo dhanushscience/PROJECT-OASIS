@@ -64,7 +64,7 @@ pub struct Decided {
 /// Whether the program a `LaunchApp` names is really there: running now, installed, or a browser
 /// with a page (`chrome|youtube.com`). A spoken "open the door" names nothing.
 pub fn launch_target_exists(value: &str, running: &[RunningApp], installed: &dyn Fn(&str) -> bool) -> bool {
-    value.contains('|') || find_running(value, running).is_some() || installed(value)
+    value.contains('|') || crate::actions::places::is_known(value) || find_running(value, running).is_some() || installed(value)
 }
 
 fn report(outcome: &'static str, label: &str, detail: &str, log: Option<String>) -> Decision {

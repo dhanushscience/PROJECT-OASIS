@@ -356,6 +356,48 @@ pub fn launch_target(query: &str) -> Option<String> {
     })
 }
 
+/// The files and folders the user can see: the Desktop and the folders open in File Explorer
+/// (`docs/OPEN_ANYTHING.md` stage 6). Hidden and system files (`desktop.ini`) are left out, and at
+/// most 500 per folder are read, so a huge Downloads folder costs a few milliseconds, not seconds.
+pub fn on_screen_items() -> Vec<oasis_core::voice::command::on_screen::ScreenItem> {
+    use std::os::windows::fs::MetadataExt;
+    const HIDDEN_OR_SYSTEM: u32 = 0x2 | 0x4;
+    let mut items = Vec::new();
+    let (folders, selected) = oasis_win::shell::on_screen_folders();
+    let is_selected = |path: &std::path::Path| selected.iter().any(|s| std::path::Path::new(s) == path);
+    for (folder, front) in folders {
+        let Ok(entries) = std::fs::read_dir(&folder) else { continue };
+        for entry in entries.flatten().take(500) {
+            let Ok(meta) = entry.metadata() else { continue };
+            if meta.file_attributes() & HIDDEN_OR_SYSTEM != 0 {
+                continue;
+            }
+            items.push(oasis_core::voice::command::on_screen::ScreenItem {
+                name: entry.file_name().to_string_lossy().into_owned(),
+                path: entry.path().to_string_lossy().into_owned(),
+                folder: meta.is_dir(),
+                front,
+                selected: is_selected(&entry.path()),
+            });
+        }
+    }
+    // Selected but not listed (past the 500 read per folder): still "this".
+    for path in &selected {
+        if !items.iter().any(|i| i.selected && std::path::Path::new(&i.path) == std::path::Path::new(path)) {
+            let p = std::path::Path::new(path);
+            let Some(name) = p.file_name() else { continue };
+            items.push(oasis_core::voice::command::on_screen::ScreenItem {
+                name: name.to_string_lossy().into_owned(),
+                path: path.clone(),
+                folder: p.is_dir(),
+                front: true,
+                selected: true,
+            });
+        }
+    }
+    items
+}
+
 /// Whether `query` names a program really on this machine, for a spoken "open X"
 /// (`docs/VOICE_DECISIONS.md` V4). Unlike [`launch_target`] it does not accept the lookup's last
 /// guess, a bare `X.exe`, unless that program is on the PATH; so "open the door" finds nothing.
@@ -499,6 +541,10 @@ mod tests {
 
     #[test]
     fn a_spoken_name_counts_as_installed_only_when_it_is_really_here() {
+        let started = Instant::now();
+        let items = on_screen_items();
+        eprintln!("on screen: {} items ({} in front) from {:?} in {:?}", items.len(), items.iter().filter(|i| i.front).count(), oasis_win::shell::on_screen_folders().0, started.elapsed());
+        assert!(!oasis_win::shell::on_screen_folders().0.is_empty(), "the Desktop is always there");
         assert!(is_installed("notepad"), "Windows always has Notepad");
         assert!(is_installed("cmd"), "a program on the PATH");
         assert!(!is_installed("the door for me"), "the lookup's last guess is not a program");

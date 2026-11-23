@@ -200,7 +200,7 @@ pub fn decide(
     mode: ApprovalMode,
 ) -> ConfirmationDecision {
     let first_use = mode == ApprovalMode::FirstUse
-        && steps.iter().filter(|(t, _)| is_first_use_sensitive(t)).any(|(t, v)| {
+        && steps.iter().filter(|(t, v)| needs_trust(t, v)).any(|(t, v)| {
             let key = target_key(t, v);
             !trusted.iter().any(|known| known.eq_ignore_ascii_case(&key))
         });
@@ -211,7 +211,15 @@ pub fn decide(
 
 /// The targets in these steps that the user may be asked to trust.
 pub fn sensitive_target_keys(steps: &[(String, String)]) -> Vec<String> {
-    steps.iter().filter(|(t, _)| is_first_use_sensitive(t)).map(|(t, v)| target_key(t, v)).collect()
+    steps.iter().filter(|(t, v)| needs_trust(t, v)).map(|(t, v)| target_key(t, v)).collect()
+}
+
+/// A first-use target, unless it only opens something to look at: a listed Windows place, a folder
+/// or a plain document (`docs/OPEN_ANYTHING.md` O10). Programs, scripts and shortcuts still ask.
+fn needs_trust(kind: &str, value: &str) -> bool {
+    let opens_only = ActionKind::of_ignore_case(kind.trim()) == ActionKind::LaunchApp
+        && (crate::actions::places::is_known(value.trim()) || super::on_screen::is_plain_open(value));
+    is_first_use_sensitive(kind) && !opens_only
 }
 
 /// The steps of an action: an automation's own steps, or the single step.
@@ -323,6 +331,12 @@ mod tests {
         assert_eq!(fast_path(&launch, &trusted(&["launchapp:spotify"]), ApprovalMode::FirstUse), FastPath::Run);
         assert_eq!(fast_path(&launch, &trusted(&["LaunchApp:SPOTIFY"]), ApprovalMode::FirstUse), FastPath::Run, "case does not matter");
         assert_eq!(fast_path(&launch, &trusted(&[]), ApprovalMode::RiskyOnly), FastPath::Run, "risky-only trusts routine apps");
+        // Only looking: a place, a folder, a document. A program on the Desktop still asks.
+        for value in ["shell:RecycleBinFolder", r"C:\Users\me\Desktop\Project\", r"C:\Users\me\Desktop\Report.pdf"] {
+            assert_eq!(fast_path(&act("LaunchApp", value), &trusted(&[]), ApprovalMode::FirstUse), FastPath::Run, "{value}");
+        }
+        assert_eq!(fast_path(&act("LaunchApp", r"C:\Users\me\Desktop\setup.exe"), &trusted(&[]), ApprovalMode::FirstUse), FastPath::Ask);
+        assert_eq!(fast_path(&act("LaunchApp", r"C:\Users\me\Desktop\Project\"), &trusted(&[]), ApprovalMode::Always), FastPath::Ask, "Always still asks");
     }
 
     #[test]

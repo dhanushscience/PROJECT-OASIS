@@ -36,6 +36,10 @@ pub struct RouterSettings {
     pub installed: Option<Vec<String>>,
     /// "copy", "undo", "ctrl z" said on their own press their keys ([`super::edit`]).
     pub edit_commands: bool,
+    /// The files and folders on the Desktop and in open Explorer windows, for "open project".
+    pub on_screen: Vec<super::on_screen::ScreenItem>,
+    /// Names of the installed apps (the cached Start list), for "did you mean …?" after a miss.
+    pub app_names: Vec<String>,
 }
 
 impl RouterSettings {
@@ -46,7 +50,7 @@ impl RouterSettings {
 
 impl Default for RouterSettings {
     fn default() -> RouterSettings {
-        RouterSettings { match_threshold: 0.72, allow_launch_app: true, allow_type_text: true, now: None, quick_launch: Vec::new(), spotify_running: false, running: Vec::new(), installed: None, edit_commands: true }
+        RouterSettings { match_threshold: 0.72, allow_launch_app: true, allow_type_text: true, now: None, quick_launch: Vec::new(), spotify_running: false, running: Vec::new(), installed: None, edit_commands: true, on_screen: Vec::new(), app_names: Vec::new() }
     }
 }
 
@@ -205,6 +209,23 @@ fn route_one(transcript: &str, lexicon: &[LexiconEntry], settings: &RouterSettin
     }
     if let Some((uri, name)) = settings_page(&normalized) {
         return RouteResult::ran(transcript, action(ActionKind::OpenSettings.as_str(), uri), format!("{name} SETTINGS").to_uppercase(), 1.0);
+    }
+    if let Some(result) = try_open_selected(&normalized, transcript, settings) {
+        return result;
+    }
+    // Before apps and "go to" switching: This PC, Recycle Bin, … are places, not programs. A file
+    // or folder on screen with exactly that name wins: "open bin" in a window showing BIN.
+    if let Some(item) = shown_by_place_words(&normalized, &settings.on_screen) {
+        if !settings.allow_launch_app {
+            return RouteResult::failed(transcript, "LaunchApp is disabled for voice.");
+        }
+        return RouteResult::ran(transcript, action(ActionKind::LaunchApp.as_str(), item.launch_value()), item.name.to_uppercase(), 1.0);
+    }
+    if let Some((name, address)) = place(&normalized) {
+        if !settings.allow_launch_app {
+            return RouteResult::failed(transcript, "LaunchApp is disabled for voice.");
+        }
+        return RouteResult::ran(transcript, action(ActionKind::LaunchApp.as_str(), address), name, 1.0);
     }
     if let Some((browser, chord)) = parse_browser_action(&normalized) {
         use crate::actions::ActionStep;
@@ -404,6 +425,53 @@ fn settings_page(normalized: &str) -> Option<(&'static str, String)> {
     crate::actions::settings_pages::resolve(name).map(|uri| (uri, name.to_string()))
 }
 
+/// "open recycle bin", "show me the trash", "go to my computer": a listed Windows place.
+fn place(normalized: &str) -> Option<(&'static str, &'static str)> {
+    let rest = PLACE_LEADS.into_iter().find_map(|p| normalized.strip_prefix(p))?;
+    crate::actions::places::resolve(rest)
+}
+
+/// "open this", "open it", "open these": what is selected in the File Explorer window in front, or
+/// on the Desktop. Several selected open together (at most 5).
+fn try_open_selected(normalized: &str, transcript: &str, settings: &RouterSettings) -> Option<RouteResult> {
+    let rest = ["open up ", "open "].into_iter().find_map(|p| normalized.strip_prefix(p))?;
+    const THIS: [&str; 14] = [
+        "this", "it", "that", "these", "them", "this one", "that one", "selected", "the selected", "the selected one",
+        "this file", "this folder", "the selected file", "the selected folder",
+    ];
+    if !THIS.contains(&rest) {
+        return None;
+    }
+    if !settings.allow_launch_app {
+        return Some(RouteResult::failed(transcript, "LaunchApp is disabled for voice."));
+    }
+    let picked: Vec<&super::on_screen::ScreenItem> = settings.on_screen.iter().filter(|i| i.selected).collect();
+    let launch = |i: &super::on_screen::ScreenItem| action(ActionKind::LaunchApp.as_str(), i.launch_value());
+    Some(match picked.as_slice() {
+        [] => RouteResult::failed(transcript, "Nothing is selected. Click a file or folder first, or say its name."),
+        [one] => RouteResult::ran(transcript, launch(one), one.name.to_uppercase(), 1.0),
+        many if many.len() <= 5 => {
+            let steps = many.iter().map(|i| crate::actions::ActionStep { kind: ActionKind::LaunchApp.as_str().into(), value: i.launch_value(), ..Default::default() }).collect();
+            RouteResult::ran(transcript, ButtonAction { kind: ActionKind::Automation.as_str().into(), value: String::new(), steps }, format!("OPEN {} ITEMS", many.len()), 1.0)
+        }
+        many => RouteResult::failed(transcript, format!("{} items are selected; select at most 5 to open them by voice.", many.len())),
+    })
+}
+
+const PLACE_LEADS: [&str; 9] = ["open up ", "open ", "show me ", "show ", "go to ", "take me to ", "launch ", "bring up ", "pull up "];
+
+/// A place phrase ("open the bin folder") whose name is, word for word, a file or folder on screen.
+fn shown_by_place_words<'a>(normalized: &str, on_screen: &'a [super::on_screen::ScreenItem]) -> Option<&'a super::on_screen::ScreenItem> {
+    place(normalized)?;
+    let rest = PLACE_LEADS.into_iter().find_map(|p| normalized.strip_prefix(p))?;
+    let rest = ["the ", "my "].into_iter().find_map(|p| rest.strip_prefix(p)).unwrap_or(rest);
+    let rest = [" folder", " file", " window"].into_iter().find_map(|s| rest.strip_suffix(s)).unwrap_or(rest);
+    match super::on_screen::find(rest, on_screen) {
+        super::on_screen::Found::Exact(item) => Some(item),
+        _ => None,
+    }
+}
+
 /// "join my meeting", "join the next call", "join meeting now".
 fn is_join_meeting(normalized: &str) -> bool {
     let Some(rest) = normalized.strip_prefix("join ") else { return false };
@@ -429,8 +497,73 @@ fn try_open(normalized: &str, transcript: &str, settings: &RouterSettings) -> Op
     // "open the chrome window", "open notepad app": the app is the name between the filler words.
     let target = target.strip_prefix("the ").unwrap_or(target);
     let target = ["window", "app", "application"].into_iter().find_map(|w| target.strip_suffix(w).and_then(|t| t.strip_suffix(' '))).filter(|t| !t.is_empty()).unwrap_or(target);
-    let guess = guess_app_from_text_if(target, &|a| settings.is_installed(a)).unwrap_or_else(|| target.to_string());
-    Some(RouteResult::ran(transcript, action(ActionKind::LaunchApp.as_str(), guess), target.to_uppercase(), 1.0))
+    // What is on screen: its exact name beats an app, a near name only when no app is meant.
+    let shown = target.strip_suffix(" folder").or_else(|| target.strip_suffix(" file")).unwrap_or(target);
+    let open_item = |item: &super::on_screen::ScreenItem| RouteResult::ran(transcript, action(ActionKind::LaunchApp.as_str(), item.launch_value()), item.name.to_uppercase(), 1.0);
+    let app = guess_app_from_text_if(target, &|a| settings.is_installed(a));
+    // "notepad" is the app, not the "Notepad++" shortcut: against an app, the name must match
+    // letter for letter, symbols included.
+    let same_name = |item: &super::on_screen::ScreenItem| app.is_none() || item.stem().to_lowercase() == shown;
+    match super::on_screen::find(shown, &settings.on_screen) {
+        super::on_screen::Found::Exact(item) if same_name(item) => return Some(open_item(item)),
+        super::on_screen::Found::Close(item) if app.is_none() => return Some(open_item(item)),
+        super::on_screen::Found::Many(items) if app.is_none() => {
+            let names = items.iter().take(4).map(|i| i.name.as_str()).collect::<Vec<_>>().join(", ");
+            return Some(RouteResult::failed(transcript, format!("\"{shown}\" could be any of: {names}. Say more of the name.")));
+        }
+        _ => {}
+    }
+    let known = app.is_some();
+    let guess = app.unwrap_or_else(|| target.to_string());
+    let mut result = RouteResult::ran(transcript, action(ActionKind::LaunchApp.as_str(), guess), target.to_uppercase(), 1.0);
+    // Used only if no such app turns out to be on the PC (decide.rs asks "Did you mean …?").
+    if !known {
+        result.suggestion = nearest(shown, settings);
+    }
+    Some(result)
+}
+
+/// The one thing "open X" most likely meant when X itself is not there: the closest name among the
+/// Windows places, the Settings pages, what is on screen and the installed apps. Only a clear
+/// winner (close enough, and ahead of the next different thing) is offered; it never runs unasked.
+fn nearest(spoken: &str, settings: &RouterSettings) -> Option<(ButtonAction, String)> {
+    if crate::matching::web_catalog::compact(spoken).len() < 3 {
+        return None;
+    }
+    let launch = |value: String| action(ActionKind::LaunchApp.as_str(), value);
+    let mut candidates: Vec<(String, ButtonAction, String)> = Vec::new();
+    for (said, name, address) in crate::actions::places::names() {
+        candidates.push((said.to_string(), launch(address.to_string()), name.to_string()));
+    }
+    for (said, uri) in crate::actions::settings_pages::names() {
+        candidates.push((said.to_string(), action(ActionKind::OpenSettings.as_str(), uri), format!("{said} settings").to_uppercase()));
+    }
+    for item in &settings.on_screen {
+        candidates.push((item.stem().to_lowercase(), launch(item.launch_value()), item.name.to_uppercase()));
+    }
+    for name in super::apps::known_launch_names().map(str::to_string).chain(settings.app_names.iter().cloned()) {
+        candidates.push((name.to_lowercase(), launch(name.clone()), name.to_uppercase()));
+    }
+    let mut best: Option<(f64, &ButtonAction, &String)> = None;
+    let mut runner_up = 0.0f64;
+    for (said, act, label) in &candidates {
+        let s = score(spoken, said);
+        match best {
+            // The same thing under another name is no rival ("trash" and "recycle bin").
+            Some((top, top_act, _)) if top_act == act => {
+                if s > top {
+                    best = Some((s, act, label));
+                }
+            }
+            Some((top, _, _)) if s <= top => runner_up = runner_up.max(s),
+            _ => {
+                runner_up = runner_up.max(best.map_or(0.0, |b| b.0));
+                best = Some((s, act, label));
+            }
+        }
+    }
+    let (top, act, label) = best?;
+    (top >= SUGGEST_FROM && top - runner_up >= 0.08).then(|| (act.clone(), label.clone()))
 }
 
 fn try_switch(normalized: &str, transcript: &str, lexicon: &[LexiconEntry]) -> Option<RouteResult> {
@@ -587,6 +720,96 @@ mod tests {
 
     fn run(text: &str) -> RouteResult {
         route(text, &lexicon(), &RouterSettings::default())
+    }
+
+    #[test]
+    fn windows_places_open_however_they_are_asked_for() {
+        // The demo miss of 2026-11-19 (docs/OPEN_ANYTHING.md): places are not programs.
+        let opens = |said: &str| run(said).action.map(|a| format!("{}:{}", a.kind, a.value));
+        let bin = Some("LaunchApp:shell:RecycleBinFolder".to_string());
+        for said in ["open recycle bin", "Open the Recycle Bin.", "show me the trash", "open recycling bin", "go to the recycle bin", "open up the bin", "pull up recycle been", "Open recycle then.", "Open recycle bit.", "Open recycle bank."] {
+            assert_eq!(opens(said), bin, "{said}");
+        }
+        let pc = Some("LaunchApp:shell:MyComputerFolder".to_string());
+        for said in ["open this pc", "Open This PC.", "go to my computer", "show this computer", "open this pc window"] {
+            assert_eq!(opens(said), pc, "{said}");
+        }
+        assert_eq!(opens("open downloads folder").as_deref(), Some("LaunchApp:shell:Downloads"));
+        assert_eq!(opens("open my documents").as_deref(), Some("LaunchApp:shell:Personal"));
+        assert_eq!(opens("open control panel").as_deref(), Some("LaunchApp:shell:ControlPanelFolder"));
+        assert_eq!(run("open recycle bin").label, "RECYCLE BIN");
+        assert_eq!(opens("open file explorer").as_deref(), Some("LaunchApp:explorer"), "File Explorer is still an app");
+        let off = RouterSettings { allow_launch_app: false, ..RouterSettings::default() };
+        assert!(!route("open recycle bin", &[], &off).success);
+    }
+
+    #[test]
+    fn a_near_miss_offers_the_closest_thing_and_never_runs_it() {
+        use super::super::on_screen::ScreenItem;
+        let s = RouterSettings {
+            on_screen: vec![ScreenItem { name: "Arduino".into(), path: r"G:\ARDUINO".into(), folder: true, front: true, selected: false }],
+            app_names: vec!["Docklight".into(), "OBS Studio".into(), "Spotify".into()],
+            ..RouterSettings::default()
+        };
+        let offer = |said: &str| route(said, &[], &s).suggestion.map(|(a, label)| (a.kind, a.value, label));
+        assert_eq!(offer("open recyle bun"), Some(("LaunchApp".into(), "shell:RecycleBinFolder".into(), "RECYCLE BIN".into())));
+        assert_eq!(offer("open blutooth"), Some(("OpenSettings".into(), "ms-settings:bluetooth".into(), "BLUETOOTH SETTINGS".into())));
+        assert_eq!(route("open arduno", &[], &s).action.map(|a| a.value).as_deref(), Some(r"G:\ARDUINO\"), "a slip of one letter opens at once (stage 6a)");
+        assert_eq!(offer("open arduweno"), Some(("LaunchApp".into(), r"G:\ARDUINO\".into(), "ARDUINO".into())), "further off: asked");
+        assert_eq!(offer("open doclight"), Some(("LaunchApp".into(), "Docklight".into(), "DOCKLIGHT".into())));
+        assert_eq!(offer("open spotifi").map(|o| o.1).as_deref(), Some("Spotify"));
+        assert_eq!(offer("open the big blue door"), None, "nothing close: no question");
+        assert_eq!(offer("open xy"), None, "too short to guess");
+        assert_eq!(offer("open chrome"), None, "a known app needs no question");
+        assert!(route("open recyle bun", &[], &s).action.is_some(), "the launch is still tried first; decide.rs asks only when it is not there");
+    }
+
+    #[test]
+    fn open_this_opens_what_is_selected() {
+        use super::super::on_screen::ScreenItem;
+        let item = |name: &str, selected| ScreenItem { name: name.into(), path: format!(r"G:\{name}"), folder: true, front: true, selected };
+        let with = |items: Vec<ScreenItem>| RouterSettings { on_screen: items, ..RouterSettings::default() };
+        let one = with(vec![item("BIN", true), item("BOOKS", false)]);
+        for said in ["Open this.", "open it", "open the selected folder", "open that one"] {
+            assert_eq!(route(said, &[], &one).action.map(|a| a.value).as_deref(), Some(r"G:\BIN\"), "{said}");
+        }
+        let two = route("open these", &[], &with(vec![item("BIN", true), item("BOOKS", true)]));
+        assert_eq!(two.label, "OPEN 2 ITEMS");
+        assert_eq!(two.action.unwrap().steps.len(), 2);
+        let none = route("open this", &[], &with(vec![item("BIN", false)]));
+        assert!(!none.success && none.message.unwrap().starts_with("Nothing is selected"));
+        let lots = route("open these", &[], &with((0..6).map(|i| item(&format!("F{i}"), true)).collect()));
+        assert!(!lots.success);
+    }
+
+    #[test]
+    fn what_is_on_screen_opens_by_name() {
+        use super::super::on_screen::ScreenItem;
+        let item = |name: &str, folder| ScreenItem { name: name.into(), path: format!(r"C:\Users\me\Desktop\{name}"), folder, front: false, selected: false };
+        let s = RouterSettings {
+            on_screen: vec![item("Project", true), item("Budget 2026.xlsx", false), item("Chromebook notes", true), item("Old", true), item("Older", true), item("Notepad++.lnk", false)],
+            ..RouterSettings::default()
+        };
+        let opens = |said: &str| route(said, &[], &s).action.map(|a| a.value);
+        assert_eq!(opens("open project").as_deref(), Some(r"C:\Users\me\Desktop\Project\"));
+        assert_eq!(opens("Open the project folder.").as_deref(), Some(r"C:\Users\me\Desktop\Project\"));
+        assert_eq!(opens("open budget").as_deref(), Some(r"C:\Users\me\Desktop\Budget 2026.xlsx"));
+        assert_eq!(route("open project", &[], &s).label, "PROJECT");
+        assert_eq!(opens("open chrome").as_deref(), Some("chrome"), "an app beats a name that only starts the same");
+        assert_eq!(opens("open notepad").as_deref(), Some("notepad"), "the app, not the Notepad++ shortcut (found on the owner's Desktop)");
+        assert_eq!(opens("open old").as_deref(), Some(r"C:\Users\me\Desktop\Old\"), "the exact name wins over a longer one");
+        assert_eq!(opens("open recycle bin").as_deref(), Some("shell:RecycleBinFolder"), "places come first");
+        // The owner's case (2026-11-19): G:\ open in front, with a folder called BIN.
+        let g = RouterSettings { on_screen: vec![ScreenItem { name: "BIN".into(), path: r"G:\BIN".into(), folder: true, front: true, selected: false }], ..RouterSettings::default() };
+        let value = |said: &str, s: &RouterSettings| route(said, &[], s).action.map(|a| a.value);
+        for said in ["open bin", "Open the bin folder.", "go to bin", "show me the bin"] {
+            assert_eq!(value(said, &g).as_deref(), Some(r"G:\BIN\"), "{said}");
+        }
+        assert_eq!(value("open recycle bin", &g).as_deref(), Some("shell:RecycleBinFolder"), "the full place name is still the place");
+        assert_eq!(value("open bin", &RouterSettings::default()).as_deref(), Some("shell:RecycleBinFolder"), "no BIN folder on screen");
+        let both = RouterSettings { on_screen: vec![item("Project old", true), item("Project new", true)], ..RouterSettings::default() };
+        let r = route("open project", &[], &both);
+        assert!(!r.success && r.message.unwrap().contains("Project old, Project new"));
     }
 
     #[test]

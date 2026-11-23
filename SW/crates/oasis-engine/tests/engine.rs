@@ -1187,6 +1187,8 @@ fn start_voiced(name: &str, live: bool, enabled: bool, heard_ms: usize, says: &s
         editable_focus: Box::new(|| true),
         running_apps: Box::new(Vec::new),
         app_installed: Box::new(pretend_installed),
+        on_screen: std::sync::Arc::new(Vec::new),
+        app_names: Box::new(Vec::new),
     };
     let h = Harness::start_full(name, &voice_profiles(enabled), live, true, Some(parts));
     Voiced { h, mic, stt_calls, loads }
@@ -1254,6 +1256,8 @@ fn the_pill_shows_before_the_focus_is_asked() {
         }),
         running_apps: Box::new(Vec::new),
         app_installed: Box::new(pretend_installed),
+        on_screen: std::sync::Arc::new(Vec::new),
+        app_names: Box::new(Vec::new),
     };
     let h = Harness::start_full("ptt-feedback-first", &voice_profiles(true), true, true, Some(parts));
     *events.lock().unwrap() = Some(Arc::clone(&h.events));
@@ -1400,6 +1404,8 @@ fn a_video_playing_in_the_browser_is_paused_while_talking_and_resumed_after() {
         editable_focus: Box::new(|| true),
         running_apps: Box::new(Vec::new),
         app_installed: Box::new(pretend_installed),
+        on_screen: std::sync::Arc::new(Vec::new),
+        app_names: Box::new(Vec::new),
     };
     let profiles = youtube_profiles(port).replace(
         "\"SchemaVersion\": 2,",
@@ -1448,6 +1454,8 @@ fn start_commands(name: &str, live: bool, extra: &str, says: &str) -> Voiced {
         editable_focus: Box::new(|| true),
         running_apps: Box::new(Vec::new),
         app_installed: Box::new(pretend_installed),
+        on_screen: std::sync::Arc::new(Vec::new),
+        app_names: Box::new(Vec::new),
     };
     let h = Harness::start_full(name, &command_profiles(extra), live, true, Some(parts));
     Voiced { h, mic, stt_calls, loads }
@@ -1607,6 +1615,8 @@ fn a_command_does_not_run_when_the_settings_signature_is_bad() {
         editable_focus: Box::new(|| false),
         running_apps: Box::new(Vec::new),
         app_installed: Box::new(pretend_installed),
+        on_screen: std::sync::Arc::new(Vec::new),
+        app_names: Box::new(Vec::new),
     };
     let h = Harness::start_full("cmd-badsig", &command_profiles(COMMAND_MODE), true, false, Some(parts));
     hold_to_talk(&h);
@@ -1828,6 +1838,8 @@ fn start_gate_with(name: &str, profiles: &str, text_field: bool, open: &[(&str, 
         editable_focus: Box::new(move || text_field),
         running_apps: Box::new(move || running.clone()),
         app_installed: Box::new(pretend_installed),
+        on_screen: std::sync::Arc::new(Vec::new),
+        app_names: Box::new(Vec::new),
     };
     let h = Harness::start_full(name, profiles, true, true, Some(parts));
     Voiced { h, mic, stt_calls, loads }
@@ -2053,6 +2065,8 @@ fn start_talking(name: &str, pause_ms: usize, pieces: &Arc<Mutex<Vec<usize>>>, s
         editable_focus: Box::new(|| true),
         running_apps: Box::new(Vec::new),
         app_installed: Box::new(pretend_installed),
+        on_screen: std::sync::Arc::new(Vec::new),
+        app_names: Box::new(Vec::new),
     };
     Harness::start_full(name, &voice_profiles(true), true, true, Some(parts))
 }

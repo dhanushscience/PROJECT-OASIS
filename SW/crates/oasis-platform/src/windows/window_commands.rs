@@ -50,10 +50,17 @@ pub fn run(kind: &str, value: &str) -> Result<(), String> {
 /// The windows an app has (front to back), or the window in front when `app` is empty.
 fn windows_of(app: &str) -> Result<Vec<i64>, String> {
     if app.is_empty() {
-        return match desktop::foreground() {
-            0 => Err("There is no window in front.".into()),
-            front => Ok(vec![front]),
-        };
+        // The desktop or taskbar in front (a click on the desktop, or a window Explorer opened
+        // without focus): "this" is the top window the user sees, never the desktop itself.
+        let front = desktop::foreground();
+        if front != 0 && !oasis_win::window::is_shell_window(WindowId(front as isize)) {
+            return Ok(vec![front]);
+        }
+        return desktop::app_windows()
+            .into_iter()
+            .find(|w| !oasis_win::window::is_shell_window(WindowId(w.handle as isize)))
+            .map(|w| vec![w.handle])
+            .ok_or_else(|| "There is no window in front.".into());
     }
     let names = program_names(app);
     let found: Vec<i64> = desktop::app_windows().into_iter().filter(|w| super::actions::runs_as(&names, &w.process)).map(|w| w.handle).collect();

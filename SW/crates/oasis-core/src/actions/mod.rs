@@ -5,6 +5,7 @@
 
 pub mod app_resolver;
 pub mod kind;
+pub mod places;
 pub mod runner;
 pub mod settings_pages;
 pub mod sounds;

@@ -145,6 +145,11 @@ fn plan_launch(query: &str) -> Launch<'_> {
     if query.len() >= 6 && query[..6].eq_ignore_ascii_case("shell:") {
         return Launch::Shell(query);
     }
+    // explorer.exe always runs (it is the taskbar), so "bring it forward" found a hidden window and
+    // nothing appeared. File Explorer always opens a new window, as its taskbar icon does.
+    if oasis_core::voice::command::apps::canonical_app(&app_resolver::normalize_token(query)) == Some("explorer") {
+        return Launch::Shell("");
+    }
     // "C:\...\chrome.exe" and "chrome.exe" name a process; a document or URL-like text does not.
     if Path::new(query).is_dir() {
         return Launch::Shell(query);
@@ -230,6 +235,35 @@ fn front_when_it_opens(names: Vec<String>, security: SecurityLog, since: Instant
     });
 }
 
+/// The File Explorer windows open now, front to back (the desktop's "Program Manager" among them,
+/// which is never new, so never brought forward).
+fn explorer_windows() -> Vec<WindowId> {
+    focus::main_windows_where(|p| runs_as(&["explorer".to_string()], p))
+}
+
+/// A place or folder opened by voice can appear behind the window in use (Windows refuses focus to
+/// Explorer here), so "close this" then meant the desktop. Wait for the new Explorer window and
+/// bring it forward, off the caller's thread.
+fn front_new_explorer(before: Vec<WindowId>, security: SecurityLog, since: Instant) {
+    std::thread::spawn(move || {
+        // Every 25 ms for up to 2 s.
+        for _ in 0..80 {
+            std::thread::sleep(Duration::from_millis(25));
+            if let Some(new) = explorer_windows().into_iter().find(|w| !before.contains(w)) {
+                focus::activate(new);
+                security.write(&format!("Launch timing: Explorer window in front {} ms after the request.", since.elapsed().as_millis()));
+                return;
+            }
+        }
+        // shortcut: Windows 11 may open the folder as a tab of a window already open, so there is no
+        // new window; the front-most Explorer window is then the one that got the tab. Upgrade to
+        // matching the tab's folder (IShellWindows) if this picks the wrong window in testing.
+        if let Some(top) = explorer_windows().into_iter().find(|w| !oasis_win::window::is_shell_window(*w)) {
+            focus::activate(top);
+        }
+    });
+}
+
 /// Does the typed name (a friendly name, a program name, a path) name this window? Compared without
 /// spaces, case or `.exe`, against the program's name and the window title.
 fn names_window(target: &str, process: &str, title: &str) -> bool {
@@ -284,7 +318,12 @@ impl ActionBackend for WindowsActions {
             Launch::Shell(location) => {
                 // A folder opens in Explorer under the folder's own name: any new titled window counts.
                 self.targets.clear();
-                shell::open("explorer.exe", Some(location)).is_ok()
+                let before = explorer_windows();
+                let opened = shell::open("explorer.exe", Some(location).filter(|l| !l.is_empty())).is_ok();
+                if opened {
+                    front_new_explorer(before, self.security.clone(), began);
+                }
+                opened
             }
             Launch::Program { query, process } => {
                 // A friendly name ("spotify", "vs code") is looked up on this machine: Start Menu,
@@ -590,6 +629,14 @@ foreach ($r in $radios) {
 }
 "#;
 
+/// Switches the Bluetooth radio on, in the background (the Settings screen's "Turn on Bluetooth").
+/// The pad connector keeps retrying, so the OASIS interface is found a few seconds later.
+pub fn turn_on_bluetooth(security: &SecurityLog) {
+    let script = RADIO_SCRIPT.replace("KINDS", "'Bluetooth'").replace("STATE", "On");
+    let security = security.clone();
+    std::thread::spawn(move || run_powershell(&script, "Radio change", &security));
+}
+
 /// The same check the action runner makes, repeated because this text goes into a script.
 fn is_brightness_arg(arg: &str) -> bool {
     let digits = arg.strip_prefix(['+', '-']).unwrap_or(arg);
@@ -766,6 +813,8 @@ mod tests {
         assert!(!runs_as(&names, "spotifyhelper") && !runs_as(&names, "co"));
         assert_eq!(plan_launch("shell:Downloads"), Launch::Shell("shell:Downloads"));
         assert_eq!(plan_launch("SHELL:AppsFolder"), Launch::Shell("SHELL:AppsFolder"));
+        assert_eq!(plan_launch("explorer"), Launch::Shell(""), "File Explorer always opens a window");
+        assert_eq!(plan_launch(r"C:\Windows\explorer.exe"), Launch::Shell(""));
         assert_eq!(
             plan_launch(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
             Launch::Program {

@@ -374,6 +374,8 @@ pub mod windows {
                     .collect()
             }),
             app_installed: Box::new(oasis_platform::windows::app_discovery::is_installed),
+            on_screen: std::sync::Arc::new(oasis_platform::windows::app_discovery::on_screen_items),
+            app_names: Box::new(|| oasis_platform::windows::app_discovery::windows_apps().cached_app_names(600)),
             pause_media: Box::new(oasis_win::media::pause_playing),
             resume_media: Box::new(oasis_win::media::resume),
         }

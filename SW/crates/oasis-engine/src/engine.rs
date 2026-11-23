@@ -723,7 +723,7 @@ fn run_loop<T: PadTransport + 'static>(
                     let installed = |name: &str| voice.app_installed(name);
                     let front = info.as_ref().map(|i| ForegroundContext::from(i).app_name).unwrap_or_default();
                     let mut snapshot = FrontSnapshot(info);
-                    if let Some(ask) = handle_heard(&spoken, &mut snapshot, voice.running_apps(), &installed, heard, now) {
+                    if let Some(ask) = handle_heard(&spoken, &mut snapshot, voice.running_apps(), &installed, &|| voice.on_screen(), &|| voice.app_names(), heard, now) {
                         context.confirmation_pending = true;
                         arbiter.set_context(context);
                         shared.emit(EngineEvent::Confirm { summary: ask.summary.clone(), close: close_target(&ask.action, &front) });

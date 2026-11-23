@@ -37,6 +37,8 @@ pub(super) fn handle_heard(
     foreground: &mut dyn ForegroundProbe,
     running: Vec<RunningApp>,
     installed: &dyn Fn(&str) -> bool,
+    on_screen: &dyn Fn() -> Vec<oasis_core::voice::command::on_screen::ScreenItem>,
+    app_names: &dyn Fn() -> Vec<String>,
     heard: Heard,
     now: Instant,
 ) -> Option<Pending> {
@@ -57,6 +59,11 @@ pub(super) fn handle_heard(
         trusted: &trusted,
         approval: approval_mode(ctx.settings),
     };
+    // The Desktop and open Explorer folders, read only for an open-style phrase (a few ms).
+    let lower = heard.text.trim().to_lowercase();
+    let opening = ["open", "launch", "start", "run", "show", "go to", "take me", "bring up", "pull up"].iter().any(|w| lower.starts_with(w));
+    let on_screen = if opening { on_screen() } else { Vec::new() };
+    let app_names = if opening { app_names() } else { Vec::new() };
     let mut route_text = |text: &str| {
         let active = foreground.current_for_press().ok().and_then(|info| {
             let found = resolve_active_profile(&ctx.settings.profiles, &ForegroundContext::from(&info), ctx.watch_token)?;
@@ -72,11 +79,14 @@ pub(super) fn handle_heard(
                 running: running.clone(),
                 // "cloud" means Claude only on a PC that has it.
                 installed: Some(["claude", "whatsapp", "kicad"].iter().filter(|a| installed(a)).map(|a| a.to_string()).collect()),
+                on_screen: on_screen.clone(),
+                app_names: app_names.clone(),
                 ..voice_router_settings(ctx.settings)
             },
         )
     };
-    let exists = |app: &str| launch_target_exists(app, &running, installed);
+    // A folder on screen exists though it is no program.
+    let exists = |app: &str| launch_target_exists(app, &running, installed) || (app.ends_with('\\') && std::path::Path::new(app).is_dir());
     let decided = decide(&facts, &mut route_text, &exists, &starts_a_shell);
 
     let say = |outcome: &str, label: &str, detail: &str| {
@@ -143,7 +153,8 @@ pub(super) fn launched_name(action: &ButtonAction, label: String, heard: &str) -
         use oasis_core::actions::app_resolver::Resolved;
         use oasis_platform::windows::app_discovery::resolve;
         let spoken_target = heard.to_lowercase().contains(&label.to_lowercase());
-        if action.kind() != ActionKind::LaunchApp || !action.steps.is_empty() || action.value.contains('|') || label.starts_with("SWITCH ") || !spoken_target {
+        // A place (`shell:RecycleBinFolder`) keeps its own name; the lookup would guess a `.exe`.
+        if action.kind() != ActionKind::LaunchApp || !action.steps.is_empty() || action.value.contains('|') || action.value.starts_with("shell:") || label.starts_with("SWITCH ") || !spoken_target {
             return label;
         }
         let lookup = oasis_core::voice::command::apps::launch_name(&action.value).unwrap_or(&action.value);

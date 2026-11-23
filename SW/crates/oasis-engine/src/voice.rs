@@ -9,6 +9,7 @@
 
 use std::collections::VecDeque;
 use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Instant as StdInstant;
 
@@ -66,6 +67,11 @@ pub struct VoiceParts {
     pub running_apps: Box<dyn Fn() -> Vec<RunningApp> + Send>,
     /// Whether a name is a program really on this PC, for a spoken "open X" (`app_discovery::is_installed`).
     pub app_installed: Box<dyn Fn(&str) -> bool + Send>,
+    /// The files and folders on the Desktop and in open Explorer windows, for "open project"
+    /// (`app_discovery::on_screen_items`). Read only for an open-style phrase.
+    pub on_screen: Arc<dyn Fn() -> Vec<oasis_core::voice::command::on_screen::ScreenItem> + Send + Sync>,
+    /// Names of the installed apps already known (never starts a scan), for "did you mean …?".
+    pub app_names: Box<dyn Fn() -> Vec<String> + Send>,
     /// Pauses whatever is playing on the PC (any player, like the keyboard's Pause key) and
     /// returns what it paused.
     pub pause_media: Box<dyn Fn() -> Vec<String> + Send>,
@@ -121,6 +127,8 @@ struct SttJob {
     last: bool,
     /// With no clip: also decode a moment of silence, so a model left idle is fast again.
     wake: bool,
+    /// Names the model should listen for in this recording (`docs/OPEN_ANYTHING.md` stage 2).
+    hotwords: Arc<Vec<String>>,
 }
 
 /// What decides which speech engine is loaded. A change in any of these needs a fresh load.
@@ -191,6 +199,10 @@ pub struct Voice {
     keep_audio: bool,
     recording: Vec<f32>,
     recording_rate: u32,
+    /// The names of what is on screen, read off the engine thread when a command press starts.
+    screen_names: Arc<Mutex<Vec<String>>>,
+    /// This recording is a command (not dictation): places and on-screen names are listened for too.
+    command_names: bool,
 }
 
 impl Voice {
@@ -230,6 +242,8 @@ impl Voice {
             keep_audio: false,
             recording: Vec::new(),
             recording_rate: 16_000,
+            screen_names: Arc::default(),
+            command_names: false,
         }
     }
 
@@ -241,7 +255,7 @@ impl Voice {
             return;
         }
         if let Some(jobs) = &self.jobs {
-            if jobs.send(SttJob { clip: None, settings: settings.clone(), last: false, wake: false }).is_ok() {
+            if jobs.send(SttJob { clip: None, settings: settings.clone(), last: false, wake: false, hotwords: Arc::default() }).is_ok() {
                 self.warmed = key;
                 self.last_stt = StdInstant::now();
             }
@@ -260,7 +274,7 @@ impl Voice {
             return;
         }
         if let Some(jobs) = &self.jobs {
-            let _ = jobs.send(SttJob { clip: None, settings: settings.clone(), last: false, wake: true });
+            let _ = jobs.send(SttJob { clip: None, settings: settings.clone(), last: false, wake: true, hotwords: Arc::default() });
         }
     }
 
@@ -275,7 +289,7 @@ impl Voice {
             return;
         }
         if let Some(jobs) = &self.jobs {
-            let _ = jobs.send(SttJob { clip: None, settings: settings.clone(), last: false, wake: true });
+            let _ = jobs.send(SttJob { clip: None, settings: settings.clone(), last: false, wake: true, hotwords: Arc::default() });
             self.last_stt = StdInstant::now();
         }
     }
@@ -320,6 +334,15 @@ impl Voice {
         match event {
             VoiceEvent::BeginRequested { dictate, enabled, .. } if self.is_idle() => {
                 self.dictate_this = dictate;
+                self.command_names = !dictate;
+                if enabled && !dictate {
+                    // Read on a thread of its own (30-65 ms of Windows calls): the press never waits.
+                    let (read, slot) = (Arc::clone(&self.parts.on_screen), Arc::clone(&self.screen_names));
+                    thread::spawn(move || {
+                        let names = read().iter().map(|i| i.stem().to_string()).collect();
+                        *slot.lock().unwrap_or_else(|e| e.into_inner()) = names;
+                    });
+                }
                 if enabled {
                     self.wake(ctx.settings);
                 }
@@ -332,9 +355,40 @@ impl Voice {
         self.run(VecDeque::from([event]), now, ctx, false);
     }
 
+    /// The names the speech model listens for in this recording: the Dictionary always, and for a
+    /// command the Windows places and what is on screen.
+    fn hotwords(&self, settings: &Settings) -> Arc<Vec<String>> {
+        // Dictation decodes greedily (faster); only a command listens for names.
+        if !self.command_names {
+            return Arc::default();
+        }
+        let dictionary: Vec<String> = VoiceSettings::from(settings).dictation_glossary.into_iter().map(|(_, written)| written).collect();
+        // Each place once by its own name ("recycle bin", not all its spoken forms): on the owner's 60
+        // clips a long list diluted every name and left fragments ("tra" from "trash").
+        let (places, screen): (Vec<String>, Vec<String>) = if self.command_names {
+            let mut seen = std::collections::HashSet::new();
+            let places = oasis_core::actions::places::names().map(|(_, name, _)| name.to_lowercase()).filter(|n| seen.insert(n.clone())).collect();
+            (places, self.screen_names.lock().unwrap_or_else(|e| e.into_inner()).clone())
+        } else {
+            (Vec::new(), Vec::new())
+        };
+        let places: Vec<&str> = places.iter().map(String::as_str).collect();
+        Arc::new(oasis_core::speech::hotwords::phrases(&dictionary, &places, &screen))
+    }
+
     /// The programs running now.
     pub fn running_apps(&self) -> Vec<RunningApp> {
         (self.parts.running_apps)()
+    }
+
+    /// The files and folders the user can see.
+    pub fn on_screen(&self) -> Vec<oasis_core::voice::command::on_screen::ScreenItem> {
+        (self.parts.on_screen)()
+    }
+
+    /// Installed app names already known, for "did you mean …?".
+    pub fn app_names(&self) -> Vec<String> {
+        (self.parts.app_names)()
     }
 
     /// Whether `name` is a program installed on this PC.
@@ -426,9 +480,14 @@ impl Voice {
             let rest = self.unsent.split_off(cut.min(self.unsent.len()));
             let piece = AudioClip { samples: std::mem::replace(&mut self.unsent, rest), sample_rate: taken.sample_rate };
             self.sent_samples += piece.samples.len();
+            // A piece with no speech is not decoded: beam search answers silence with "Yeah." or
+            // "Mm-hmm." (sherpa-onnx 2.0.2, length reward 0.5), as the last piece already is not.
+            if !oasis_core::speech::audio::has_speech(&piece.samples, piece.sample_rate) {
+                continue;
+            }
             self.paragraph_before.push_back(self.sent_pieces > 0 && oasis_core::speech::audio::starts_paragraph(&piece.samples, piece.sample_rate));
             self.sent_pieces += 1;
-            let _ = jobs.send(SttJob { clip: Some(piece), settings: settings.clone(), last: false, wake: false });
+            let _ = jobs.send(SttJob { clip: Some(piece), hotwords: self.hotwords(settings), settings: settings.clone(), last: false, wake: false });
             self.last_stt = StdInstant::now();
         }
     }
@@ -529,7 +588,7 @@ impl Voice {
                 } else if let Some(jobs) = &self.jobs {
                     self.paragraph_before.push_back(paragraph);
                     self.last_stt = StdInstant::now();
-                    if jobs.send(SttJob { clip: Some(clip), settings: ctx.settings.clone(), last: true, wake: false }).is_err() {
+                    if jobs.send(SttJob { clip: Some(clip), hotwords: self.hotwords(ctx.settings), settings: ctx.settings.clone(), last: true, wake: false }).is_err() {
                         self.texts.clear();
                         self.openings.clear();
                         self.paragraph_before.clear();
@@ -596,11 +655,13 @@ const TRIM_BEFORE_STT: bool = false;
 /// Loads the speech model on the first recording (it takes seconds) and keeps it.
 fn speech_thread(inbox: &Receiver<SttJob>, outcomes: &Sender<SttOutcome>, load: &LoadStt) {
     let mut engine: Option<(String, Box<dyn SttEngine>)> = None;
+    let mut last_hotwords: Vec<String> = Vec::new();
     for job in inbox {
         let wanted = engine_key(&job.settings);
         let started = StdInstant::now();
         if engine.as_ref().is_none_or(|(have, _)| *have != wanted) {
             engine = None; // free the old model before loading the next one
+            last_hotwords.clear(); // a new engine has none
             match load(&job.settings) {
                 Ok(loaded) => engine = Some((wanted, loaded)),
                 // A failed preload is reported by the first recording that needs the engine.
@@ -628,6 +689,12 @@ fn speech_thread(inbox: &Receiver<SttJob>, outcomes: &Sender<SttOutcome>, load: 
         } else {
             job_clip
         };
+        let mut job_clip = job_clip;
+        oasis_core::speech::audio::normalize(&mut job_clip.samples); // a quiet built-in mic decodes worse
+        if *job.hotwords != last_hotwords {
+            stt.set_hotwords(&job.hotwords);
+            last_hotwords = job.hotwords.to_vec();
+        }
         let decoding = StdInstant::now();
         let outcome = match stt.transcribe(&job_clip) {
             Ok(text) => SttOutcome::Heard {

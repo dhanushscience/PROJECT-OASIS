@@ -26,6 +26,7 @@ pub mod edit;
 pub mod gate;
 pub mod intent;
 pub mod lexicon;
+pub mod on_screen;
 pub mod reminders;
 pub mod router;
 pub mod safety;

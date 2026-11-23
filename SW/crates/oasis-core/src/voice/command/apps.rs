@@ -26,7 +26,7 @@ const VARIANTS: [(&str, &[&str]); 14] = [
     ("brave", &["brave", "bravebrowser"]),
     ("notepad", &["notepad", "notepadapp", "notespad"]),
     ("calc", &["calc", "calculator", "calculatorapp"]),
-    ("explorer", &["explorer", "fileexplorer", "myfiles", "thispc", "windowsexplorer"]),
+    ("explorer", &["explorer", "fileexplorer", "myfiles", "windowsexplorer"]),
     ("spotify", &["spotify", "spotifyapp", "spotifymusic"]),
     ("kicad", &["kicad", "keycad", "kycad", "kikad", "kicadeditor"]),
     ("claude", &["claude", "claudecode"]),
@@ -65,6 +65,11 @@ const KNOWN_ALIASES: [&str; 14] = [
     "cursor", "vscode", "code", "visualstudio", "devenv", "notepad", "calc", "calculator", "explorer",
     "chrome", "edge", "firefox", "idea", "pycharm",
 ];
+
+/// The Start Menu names of the apps OASIS knows by heart ("Visual Studio Code", "Google Chrome").
+pub fn known_launch_names() -> impl Iterator<Item = &'static str> {
+    LAUNCH_NAMES.iter().map(|(_, name)| *name)
+}
 
 /// The launcher name for a spoken app name ("vs code" → `code`).
 pub fn canonical_app(spoken: &str) -> Option<&'static str> {
