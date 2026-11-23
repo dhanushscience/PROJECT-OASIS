@@ -26,7 +26,7 @@ loads on the first recording and stays loaded.
   16 kHz by averaging, so high tones do not fold into speech; `_at` resamples one piece of a longer
   recording and carries the fraction to the next piece), `level` (a level meter), `MODEL_RATE`.
 - `sherpa.rs`: sherpa-onnx's C API loaded from `sherpa-onnx-c-api.dll` (D19). The C structs mirror
-  `c-api.h` of **1.13.5**; the DLL must be that version. `SherpaTransducer::load` (transducer
+  `c-api.h` of **2.0.2**; the DLL must be that version. `SherpaTransducer::load` (transducer
   layout) and `load_model` (any `ModelLayout`: transducer, NeMo CTC or Moonshine) give an
   `SttEngine`. `detect_transducer` and `detect_model` find a model's files (int8 preferred on a
   CPU, fp16 on a GPU). `dll_search_folders` looks in `OASIS_SHERPA_DIR`, beside the program, and in
@@ -50,7 +50,7 @@ loads on the first recording and stays loaded.
 ## Invariants
 
 - Audio handed to the model is 16 kHz mono (`MODEL_RATE`).
-- The sherpa-onnx DLL must match the C structs mirrored from `c-api.h` 1.13.5.
+- The sherpa-onnx DLL must match the C structs mirrored from `c-api.h` 2.0.2 (the `lib` folder of the release asset `sherpa-onnx-v2.0.2-win-x64-shared-MT-Release-no-tts`).
 - `unsafe` carries a `SAFETY:` note (D13).
 - Audio is kept only between `start` and `stop`; before `start` nothing is recorded.
 - `SherpaTransducer` is used through `&mut self`, so one thread decodes at a time.

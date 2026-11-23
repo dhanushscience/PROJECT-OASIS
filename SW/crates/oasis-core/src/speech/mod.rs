@@ -27,6 +27,7 @@ pub mod fixes;
 pub mod formatter;
 pub mod fragments;
 pub mod glossary;
+pub mod hotwords;
 pub mod layout;
 pub mod meaning;
 pub mod numbers;

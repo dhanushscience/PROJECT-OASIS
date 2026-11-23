@@ -167,9 +167,12 @@ pub const SPEECH_HANGOVER_FRAMES: usize = 10;
 pub const SPEECH_RMS_MIN: f32 = 300.0;
 pub const SPEECH_RMS_MAX: f32 = 600.0;
 
+/// Frame loudness after the same boost [`normalize`] gives, so a quiet microphone is judged by the
+/// thresholds below as a normal one is.
 fn frame_rms(samples: &[f32], rate: u32) -> Vec<f32> {
     let window = (rate as usize * DEFAULT_WINDOW_MS / 1000).max(1);
-    samples.chunks_exact(window).map(|w| (w.iter().map(|s| s * s).sum::<f32>() / window as f32).sqrt() * 32768.0).collect()
+    let gain = quiet_gain(samples);
+    samples.chunks_exact(window).map(|w| (w.iter().map(|s| s * s).sum::<f32>() / window as f32).sqrt() * 32768.0 * gain).collect()
 }
 
 /// One flag per 20 ms frame: speech starts after [`SPEECH_START_FRAMES`] loud frames (flagged from
@@ -230,6 +233,51 @@ pub fn trim_to_speech(samples: &[f32], rate: u32) -> &[f32] {
     &samples[(first * window).saturating_sub(pad)..((last + 1) * window + pad).min(samples.len())]
 }
 
+/// Raises a quiet recording (a laptop's own microphone) to a normal speaking level. The level is
+/// the 99.5th percentile of the samples, not the peak, so one click or pop cannot hold the gain
+/// down. Never lowers it and never raises it past `QUIET_MAX_GAIN` times, so near-silence is not
+/// blown up into noise. Loud moments that overshoot are soft-limited, not cut flat.
+pub fn normalize(samples: &mut [f32]) {
+    let gain = quiet_gain(samples);
+    if gain > 1.0 {
+        samples.iter_mut().for_each(|s| *s = soft_limit(*s * gain));
+    }
+}
+
+/// The gain [`normalize`] applies: 1.0 when the clip is loud enough or only room noise.
+fn quiet_gain(samples: &[f32]) -> f32 {
+    let mut buckets = [0u32; 1024];
+    for s in samples {
+        buckets[((s.abs() * 1024.0) as usize).min(1023)] += 1;
+    }
+    let keep = samples.len() - samples.len() / 200; // up to the 99.5th percentile
+    let (mut seen, mut level) = (0usize, 1.0f32);
+    for (i, n) in buckets.iter().enumerate() {
+        seen += *n as usize;
+        if seen >= keep {
+            level = (i + 1) as f32 / 1024.0;
+            break;
+        }
+    }
+    if samples.is_empty() || level < QUIET_MIN_LEVEL {
+        return 1.0;
+    }
+    let gain = (QUIET_TARGET_LEVEL / level).min(QUIET_MAX_GAIN);
+    if gain > 1.2 { gain } else { 1.0 }
+}
+
+fn soft_limit(s: f32) -> f32 {
+    const KNEE: f32 = 0.8;
+    if s.abs() <= KNEE {
+        s
+    } else {
+        s.signum() * (KNEE + (1.0 - KNEE) * ((s.abs() - KNEE) / (1.0 - KNEE)).tanh())
+    }
+}
+const QUIET_TARGET_LEVEL: f32 = 0.5;
+const QUIET_MAX_GAIN: f32 = 8.0;
+const QUIET_MIN_LEVEL: f32 = 0.01; // below this it is room noise, not a voice
+
 /// Whether a piece that opens with `samples` follows a pause long enough for a new paragraph.
 /// The piece before it ended [`SEGMENT_PAUSE_MS`]` / 2` into the pause ([`segment_cut`]).
 pub fn starts_paragraph(samples: &[f32], rate: u32) -> bool {
@@ -241,6 +289,23 @@ pub fn starts_paragraph(samples: &[f32], rate: u32) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn normalize_raises_quiet_audio_only() {
+        let level = |v: &[f32]| v.iter().fold(0.0f32, |m, s| m.max(s.abs()));
+        // Speech-like: mostly a 0.05 tone, one 0.9 click that must not hold the gain down.
+        let mut quiet: Vec<f32> = (0..16_000).map(|i| 0.05 * (i as f32 * 0.3).sin()).collect();
+        quiet[100] = 0.9;
+        normalize(&mut quiet);
+        assert!(quiet[1000..16_000].iter().fold(0.0f32, |m, s| m.max(s.abs())) > 0.3);
+        assert!(level(&quiet) <= 1.0);
+        let mut loud = [0.6, -0.5];
+        normalize(&mut loud);
+        assert_eq!(loud, [0.6, -0.5]);
+        let mut hiss = [0.005, -0.004];
+        normalize(&mut hiss);
+        assert_eq!(hiss, [0.005, -0.004]);
+    }
 
     /// `parts` of (milliseconds, loud) at 16 kHz.
     fn talk(parts: &[(usize, bool)]) -> Vec<f32> {

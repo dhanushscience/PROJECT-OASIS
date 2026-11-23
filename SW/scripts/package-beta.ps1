@@ -22,7 +22,7 @@ $stage = Join-Path $sw "dist\stage"
 # 1. Stage what the installer carries.
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 $native = New-Item -ItemType Directory -Force (Join-Path $stage "native")
-foreach ($f in "sherpa-onnx-c-api.dll", "onnxruntime.dll") {
+foreach ($f in "sherpa-onnx-c-api.dll", "onnxruntime.dll", "onnxruntime_providers_shared.dll") {
     $src = Join-Path $SpeechEngine $f
     if (-not (Test-Path $src)) { throw "Missing $src. Run copy-speech-engine.ps1 first, or pass -SpeechEngine." }
     Copy-Item $src $native

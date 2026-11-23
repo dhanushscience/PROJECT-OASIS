@@ -225,6 +225,14 @@ fn open(
     Err(last_error)
 }
 
+/// The meter reading for a block `now` when the recent loudest block was `loudest`: a quiet
+/// microphone is lifted (at most 8x) so speech swings the pill as much as on an external one.
+/// Room noise stays low because `loudest` below 0.02 is not lifted further.
+fn meter_level(now: f32, loudest: f32) -> f32 {
+    let gain = (0.4 / loudest.max(0.02)).clamp(1.0, 8.0);
+    (now * gain).min(1.0)
+}
+
 fn open_with(
     device: &cpal::Device,
     supported: &cpal::SupportedStreamConfig,
@@ -236,10 +244,13 @@ fn open_with(
 
     let sink = Arc::clone(recorded);
     let meter = Arc::clone(level_out);
-    let push = move |frames: Vec<f32>| {
+    let mut loudest = 0.0f32; // the recent loudest block, so a quiet microphone's meter moves like a loud one's
+    let mut push = move |frames: Vec<f32>| {
         let mono = to_mono(&frames, channels);
+        let now = level(&mono);
+        loudest = now.max(loudest * 0.995);
         if let Ok(mut l) = meter.lock() {
-            *l = level(&mono);
+            *l = meter_level(now, loudest);
         }
         if let Ok(mut buffer) = sink.lock() {
             buffer.extend_from_slice(&mono);
@@ -284,6 +295,13 @@ fn open_with(
 mod tests {
     use super::*;
     use crate::resample::to_model_rate;
+
+    #[test]
+    fn a_quiet_microphone_moves_the_meter_like_a_loud_one() {
+        assert!((meter_level(0.05, 0.05) - 0.4).abs() < 1e-4); // quiet speech peak reads 0.4
+        assert_eq!(meter_level(0.5, 0.5), 0.5); // loud mic untouched
+        assert!(meter_level(0.005, 0.01) <= 0.05); // room noise stays low
+    }
 
     #[test]
     fn stopping_without_starting_gives_an_empty_clip() {

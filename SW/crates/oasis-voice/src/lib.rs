@@ -9,6 +9,8 @@
 //! | [`resample`] | Mono 16 kHz audio for the model, a level meter | (inside `MicrophoneCapture.cs`) |
 //! | [`sherpa`] | sherpa-onnx transducer (Parakeet) speech-to-text | `SpeechRecognizer*.cs`, `SttModelCatalog.cs` |
 
+pub mod cue;
+pub mod hotwords;
 pub mod mic;
 pub mod resample;
 pub mod sherpa;

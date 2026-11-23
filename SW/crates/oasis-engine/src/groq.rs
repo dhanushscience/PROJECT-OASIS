@@ -206,6 +206,13 @@ impl SttEngine for GroqStt {
             },
         }
     }
+
+    /// Groq gets the Dictionary as its prompt; the names reach the local model kept as a fallback.
+    fn set_hotwords(&mut self, phrases: &[String]) {
+        if let Some(local) = self.local.as_mut() {
+            local.set_hotwords(phrases);
+        }
+    }
 }
 
 #[cfg(test)]

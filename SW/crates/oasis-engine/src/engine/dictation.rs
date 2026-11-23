@@ -79,8 +79,14 @@ pub(super) const VOICE_WAKE: &[u8] = include_bytes!("../../assets/voice-wake.wav
 
 /// Plays one of the two cues, unless Settings › Pad › Sound is off.
 pub(super) fn cue(settings: &Settings, wav: &'static [u8]) {
-    if VoiceSettings::from(settings).sounds {
+    let voice = VoiceSettings::from(settings);
+    if !voice.sounds {
+        return;
+    }
+    if voice.speaker.is_empty() {
         oasis_win::system::play_wav(wav);
+    } else {
+        oasis_voice::cue::play(wav, &voice.speaker, oasis_win::system::play_wav);
     }
 }
 

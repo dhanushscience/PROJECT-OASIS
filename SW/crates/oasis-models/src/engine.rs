@@ -36,6 +36,9 @@ pub struct AudioClip {
 
 pub trait SttEngine: Send {
     fn transcribe(&mut self, audio: &AudioClip) -> Result<String, ModelError>;
+    /// Names to listen for in the next recordings (the Dictionary, places, what is on screen).
+    /// Engines that cannot be biased ignore them.
+    fn set_hotwords(&mut self, _phrases: &[String]) {}
 }
 
 pub trait LlmEngine: Send {
