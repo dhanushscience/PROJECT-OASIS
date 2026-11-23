@@ -27,7 +27,14 @@ enum Mode {
     Close = 4,
     Learn = 5,
     Mic = 6,
+    /// Why a spoken command did not run; hides itself after [`NOTE_FOR`].
+    Note = 7,
 }
+
+/// How long a "did not run" note stays up.
+const NOTE_FOR: std::time::Duration = std::time::Duration::from_millis(4000);
+/// Counts notes, so an older note's timer does not hide a newer one.
+static NOTE_COUNT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
 static MODE: AtomicU8 = AtomicU8::new(Mode::Hidden as u8);
 
 /// How the pop-up is drawn: lying across (Bottom) or standing up (Left/Right, the "vertical pop-up"
@@ -59,7 +66,7 @@ impl Mode {
             Mode::Ready => (260.0, 64.0),
             Mode::Close | Mode::Hidden => (480.0, 90.0),
             Mode::Learn => (340.0, 130.0),
-            Mode::Mic => (480.0, 90.0),
+            Mode::Mic | Mode::Note => (480.0, 90.0),
         }
     }
 }
@@ -104,7 +111,7 @@ pub fn end_learn<R: Runtime>(app: &AppHandle<R>) {
 
 /// React to an engine event: show, move or hide the window. The page reacts to the same event itself.
 pub fn on_engine_event<R: Runtime>(app: &AppHandle<R>, event: &oasis_engine::EngineEvent) {
-    use oasis_engine::EngineEvent::{Confirm, ConfirmEnd, MicOffer, Voice};
+    use oasis_engine::EngineEvent::{Confirm, ConfirmEnd, MicOffer, Voice, VoiceCommand};
     let wanted = match event {
         Voice { phase } => {
             // The question stays up over the pill; voice events do not close it.
@@ -123,12 +130,29 @@ pub fn on_engine_event<R: Runtime>(app: &AppHandle<R>, event: &oasis_engine::Eng
                 }
                 p if p.starts_with("getting_ready:") => Mode::Ready,
                 // an idle voice does not take the offer down; it ends on its own answer
-                _ if matches!(MODE.load(Ordering::Relaxed), m if m == Mode::Learn as u8 || m == Mode::Mic as u8) => return,
+                // nor the note saying why a command did not run: it goes after NOTE_FOR
+                _ if matches!(MODE.load(Ordering::Relaxed), m if m == Mode::Learn as u8 || m == Mode::Mic as u8 || m == Mode::Note as u8) => return,
                 _ => Mode::Hidden,
             }
         }
         Confirm { .. } => Mode::Close,
         MicOffer { .. } => Mode::Mic,
+        // "Nothing is selected", "no app called …": said on screen, not only in the log. A question
+        // or offer already up keeps the window.
+        VoiceCommand { outcome, detail, .. } if matches!(outcome.as_str(), "no_match" | "blocked") && !detail.is_empty() => {
+            if matches!(MODE.load(Ordering::Relaxed), m if m == Mode::Close as u8 || m == Mode::Mic as u8 || m == Mode::Learn as u8) {
+                return;
+            }
+            let app = app.clone();
+            let this_note = NOTE_COUNT.fetch_add(1, Ordering::Relaxed) + 1;
+            std::thread::spawn(move || {
+                std::thread::sleep(NOTE_FOR);
+                if NOTE_COUNT.load(Ordering::Relaxed) == this_note && MODE.compare_exchange(Mode::Note as u8, Mode::Hidden as u8, Ordering::Relaxed, Ordering::Relaxed).is_ok() {
+                    let _ = apply(&app, Mode::Hidden);
+                }
+            });
+            Mode::Note
+        }
         ConfirmEnd { .. } if matches!(MODE.load(Ordering::Relaxed), m if m == Mode::Close as u8 || m == Mode::Mic as u8) => Mode::Hidden,
         _ => return,
     };
@@ -141,11 +165,20 @@ fn apply<R: Runtime>(app: &AppHandle<R>, mode: Mode) -> tauri::Result<()> {
     let Some(window) = app.get_webview_window(LABEL) else {
         return Ok(());
     };
+    // What was last put on screen: an event that changes nothing (every "listening" tick) must not
+    // touch the window again, each such call restyles it and can flash the system frame.
+    static SHOWN: std::sync::Mutex<Option<(u8, i32, i32, u32, u32)>> = std::sync::Mutex::new(None);
     if mode == Mode::Hidden {
+        *SHOWN.lock().unwrap_or_else(|e| e.into_inner()) = None;
         return window.hide();
     }
-    // Only the tick and cross take clicks; everything else lets them through. The window still never takes focus.
-    window.set_ignore_cursor_events(!matches!(mode, Mode::Locked | Mode::Learn | Mode::Mic))?;
+    // Only the buttons take clicks (tick and cross, the question's Run / Cancel, the offers); everything
+    // else lets them through. The window still never takes focus.
+    let clicks = matches!(mode, Mode::Locked | Mode::Learn | Mode::Mic | Mode::Close);
+    let mut shown = SHOWN.lock().unwrap_or_else(|e| e.into_inner());
+    if shown.is_none_or(|(m, ..)| (m == Mode::Locked as u8 || m == Mode::Learn as u8 || m == Mode::Mic as u8 || m == Mode::Close as u8) != clicks) {
+        window.set_ignore_cursor_events(!clicks)?;
+    }
     // shortcut: the pop-up always lies across the bottom; the stored `SIDE` (vertical layout) is ignored, read `SIDE` here to stand it up again.
     let side = Side::Bottom;
     let (w, h) = mode.size(side);
@@ -177,9 +210,14 @@ fn apply<R: Runtime>(app: &AppHandle<R>, mode: Mode) -> tauri::Result<()> {
                 work.bottom - ph - (PILL_LIFT * scale).round() as i32,
             );
             // Position, size, position: a window that crosses to a screen with another scale is resized by Windows.
+            let placed = (mode as u8, x, y, pw as u32, ph as u32);
+            if *shown == Some(placed) {
+                return Ok(());
+            }
             window.set_position(PhysicalPosition::new(x, y))?;
             window.set_size(PhysicalSize::new(pw as u32, ph as u32))?;
             window.set_position(PhysicalPosition::new(x, y))?;
+            *shown = Some(placed);
         }
     }
     window.show()

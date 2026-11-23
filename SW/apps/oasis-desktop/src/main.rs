@@ -228,6 +228,7 @@ fn quit(app: &AppHandle) {
 struct StartupHold(#[allow(dead_code)] Mutex<system::Startup>);
 
 fn main() {
+    oasis_win::power::opt_out_of_throttling();
     // A Rust panic is written to crash.log (with the calls that led to it); without this it leaves no trace.
     if let Some(paths) = oasis_platform::paths::OasisPaths::detect() {
         oasis_platform::crash_log::CrashLog::at(paths.crash_log()).install_panic_hook();
@@ -325,6 +326,7 @@ fn main() {
             onboarding::onboarding_check_mic,
             onboarding::onboarding_layout,
             onboarding::onboarding_open_mic_settings,
+            onboarding::bluetooth_turn_on,
             onboarding::onboarding_test_groq,
             onboarding::onboarding_open_groq_keys
         ])

@@ -455,6 +455,19 @@ pub fn onboarding_check_mic(app: AppHandle) -> MicInfo {
     MicInfo { names }
 }
 
+/// Turns the Bluetooth radio on, so the pad can be found. Falls back to nothing on other systems.
+#[tauri::command]
+pub fn bluetooth_turn_on() -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        let paths = oasis_engine::defaults::detect_paths().ok_or("OASIS could not find its data folder.")?;
+        oasis_platform::windows::actions::turn_on_bluetooth(&oasis_platform::security_log::SecurityLog::at(paths.security_log()));
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    Err("Turn on Bluetooth in your system settings.".into())
+}
+
 /// Opens the Windows page where an app is allowed to use the microphone. The address is fixed here.
 #[tauri::command]
 pub fn onboarding_open_mic_settings() -> Result<(), String> {

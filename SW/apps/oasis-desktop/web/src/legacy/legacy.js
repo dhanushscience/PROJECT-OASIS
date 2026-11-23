@@ -26,7 +26,17 @@
     warnings.hidden = reply.warnings.length === 0;
     warnings.textContent = reply.warnings.join(' ');
     // Each section of fields goes to its place in the Settings pop-up (SettingsDialog.svelte).
-    const hosts = { general: 'settings-general', pad: 'settings-gestures', youtube: 'settings-gestures', meetings: 'settings-connections', preferences: 'settings-preferences' };
+    const hosts = { general: 'settings-general', pad: 'settings-gestures', youtube: 'settings-gestures', meetings: 'settings-connections' };
+    // Shown on the Voice screen instead; the browser link joins the YouTube gestures it serves.
+    const onVoiceScreen = new Set(['pad.sounds', 'general.paste_dictation', 'general.paste_tag', 'preferences.browser']);
+    const toYoutube = new Set(['general.bridge_enabled', 'general.bridge_port']);
+    for (const s of reply.sections) s.fields = s.fields.filter((f) => !onVoiceScreen.has(f.id));
+    const general = reply.sections.find((s) => s.id === 'general');
+    const youtube = reply.sections.find((s) => s.id === 'youtube');
+    if (general && youtube) {
+      youtube.fields.push(...general.fields.filter((f) => toYoutube.has(f.id)));
+      general.fields = general.fields.filter((f) => !toYoutube.has(f.id));
+    }
     for (const id of new Set(Object.values(hosts))) $(id)?.replaceChildren();
     for (const section of reply.sections) {
       const host = $(hosts[section.id]);

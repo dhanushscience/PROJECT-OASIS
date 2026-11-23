@@ -27,7 +27,7 @@
   /** @param {{ sections: { id: string, fields: Field[] }[] }} reply */
   function take(reply) {
     const voice = reply.sections.find((s) => s.id === 'voice');
-    fields = Object.fromEntries((voice?.fields ?? []).map((f) => [f.id, f]));
+    fields = Object.fromEntries([...(voice?.fields ?? []), ...reply.sections.flatMap((s) => s.fields).filter((f) => ['pad.sounds', 'general.paste_dictation', 'general.paste_tag', 'preferences.browser'].includes(f.id))].map((f) => [f.id, f]));
     loaded = true;
   }
   async function load() {
@@ -171,9 +171,18 @@
     if (form[k].editing === g.key) { form[k].editing = ''; form[k].heard = form[k].write = ''; form[k].more = false; }
   }
   /** The Dictionary shows a few rows of each kind; the rest, with search, is in a window. */
-  const SHOWN = 6;
   const MY_SHOWN = 12; // chips; a shortcut over measuring the box, since a chip's width varies
   let allOpen = $state(false);
+  /** True when the corrected-words list is taller than the room the card leaves it: only then the dots show. */
+  let over = $state(false);
+  /** @param {HTMLElement} node @param {number} _n */
+  function overflows(node, _n) {
+    const f = () => (over = node.scrollHeight - node.clientHeight > 1);
+    const ro = new ResizeObserver(f);
+    ro.observe(node);
+    f();
+    return { update: () => queueMicrotask(f), destroy: () => ro.disconnect() };
+  }
   const portal = (/** @type {HTMLElement} */ node) => { document.body.appendChild(node); return { destroy: () => node.remove() }; };
   const stopEditing = (/** @type {ListKey} */ k) => { form[k].editing = ''; form[k].heard = form[k].write = ''; form[k].more = false; };
 </script>
@@ -196,21 +205,23 @@
     <div class="add1">
       <input class="main" bind:value={fm.write} placeholder="Word to add, e.g. KiCad" aria-label="Word to add" autocomplete="off" onkeydown={(e) => e.key === 'Enter' && addWord(k)} />
       <span class="addbtns">
+        {#if saved}<span class="saved mono" role="status">✓ {saved}</span>{/if}
         <button class="dark" disabled={!fm.write.trim()} onclick={() => addWord(k)}>{fm.editing ? 'Update' : t.add}</button>
         {#if fm.editing}<button class="quiet" onclick={() => stopEditing(k)}>Cancel</button>{/if}
       </span>
+      {#if fm.more}
+        <input class="main" bind:value={fm.heard} placeholder="Misheard as, e.g. kay cad, keycat" title="Separate several with commas" aria-label="Misheard as" autocomplete="off" onkeydown={(e) => e.key === 'Enter' && addWord(k)} />
+      {:else}
+        <button class="more" title="If it gets misheard, add how it sounds" onclick={() => (fm.more = true)}><b aria-hidden="true">+</b> Misheard as</button>
+      {/if}
     </div>
-    {#if fm.more}
-      <input class="sec" bind:value={fm.heard} placeholder="Misheard as, e.g. kay cad, keycat (commas between)" aria-label="Misheard as" autocomplete="off" onkeydown={(e) => e.key === 'Enter' && addWord(k)} />
-    {:else}
-      <button class="more" onclick={() => (fm.more = true)}><b aria-hidden="true">+</b> It gets misheard? Add how it sounds</button>
-    {/if}
   {:else}
   <div class="add">
     <input bind:value={fm.heard} placeholder={t.heard} aria-label={t.heard} autocomplete="off" onkeydown={(e) => e.key === 'Enter' && addWord(k)} />
     <span class="to" aria-hidden="true">→</span>
     <input bind:value={fm.write} placeholder={t.write} aria-label={t.write} autocomplete="off" onkeydown={(e) => e.key === 'Enter' && addWord(k)} />
     <span class="addbtns">
+      {#if saved}<span class="saved mono" role="status">✓ {saved}</span>{/if}
       <button class="dark" disabled={(k !== 'words' && !fm.heard.trim()) || !fm.write.trim()} onclick={() => addWord(k)}>{fm.editing ? 'Update' : t.add}</button>
       {#if fm.editing}<button class="quiet" onclick={() => stopEditing(k)}>Cancel</button>{/if}
     </span>
@@ -223,6 +234,12 @@
     <button class="pick" title="Edit" onclick={() => editWord(k, g)}>{g.write}</button>
     <button class="del" aria-label="Remove {g.write}" onclick={() => removeWord(k, g)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg></button>
   </span>
+{/snippet}
+
+{#snippet viewAll(/** @type {number} */ n)}
+  <button class="viewall" title="Open the whole dictionary: search, edit, remove" onclick={() => (allOpen = true)}>
+    View all {n}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" /></svg>
+  </button>
 {/snippet}
 
 {#snippet listCard(/** @type {ListKey} */ k)}
@@ -243,13 +260,13 @@
       <!-- your own words on top, the mis-heard ones with their fix below; a search looks through both -->
       {#if mine.length}
         <div class="subrow"><span class="sub">My words <span class="cnt">· {mine.length}</span></span>
-          {#if mine.length > MY_SHOWN}<button class="dots" aria-label="Show all {mine.length} of my words" title="Show all, search and edit" onclick={() => (allOpen = true)}><span aria-hidden="true">···</span></button>{/if}</div>
+          {#if mine.length > MY_SHOWN || over}{@render viewAll(groups.words.length)}{/if}</div>
         <div class="chips">{#each mine.slice(0, MY_SHOWN) as g (g.key)}{@render chip(k, g)}{/each}</div>
       {/if}
       {#if fixed.length}
         <div class="subrow"><span class="sub">Corrected words <span class="cnt">· {fixed.length}</span></span>
-          {#if fixed.length > SHOWN}<button class="dots" aria-label="Show all {fixed.length} corrected words" title="Show all, search and edit" onclick={() => (allOpen = true)}><span aria-hidden="true">···</span></button>{/if}</div>
-        <div class="words fit">{#each fixed.slice(0, SHOWN) as g (g.key)}{@render wordRow(k, g)}{/each}</div>
+          {#if over && !mine.length}{@render viewAll(groups.words.length)}{/if}</div>
+        <div class="words clip" use:overflows={fixed.length}>{#each fixed as g (g.key)}{@render wordRow(k, g)}{/each}</div>
       {/if}
       {#if allOpen}
         <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
@@ -316,6 +333,8 @@
         </div>
       </div>
       {@render pick('voice.hold_ms', 'Hold for', 'How long to hold before it starts listening.')}
+      {@render toggle('pad.sounds', 'Click sounds', 'A short click when listening starts and when the text is typed.')}
+      {@render pick('voice.speaker', 'Sound output', 'Where the start and end sounds play. Pick your real speaker if a USB microphone takes over the default.')}
     </section>
 
     <section class="group" aria-label="Speech to text">
@@ -349,6 +368,8 @@
     <section class="group" aria-label="Clean up">
       <div class="ghead"><span class="lab"><b>03</b> Clean up</span><Switch checked={!!v('voice.dictation_cleanup')} label="Fix grammar and punctuation" onchange={(on) => set('voice.dictation_cleanup', on)} /></div>
       <p class="gh">{v('voice.dictation_cleanup') ? 'Fixed before typing: “comma” and “full stop” become symbols, number words become digits, “um” goes, “no, actually …” keeps the correction, and capitals are added.' : 'Typed exactly as it was heard.'}</p>
+      {@render toggle('general.paste_dictation', 'Type it where the cursor is', 'Off: it is only transcribed and kept in Insights.')}
+      {@render toggle('general.paste_tag', 'Add “[typed using project OASIS]”', 'After each typed dictation.')}
       {@render pick('voice.capture_mode', 'A recording becomes', 'Typed where the cursor is, run as a command, or decided by what you say.')}
     </section>
 
@@ -369,6 +390,7 @@
       {@render toggle('voice.allow_launch_app', 'Let voice open apps')}
       {@render toggle('voice.allow_type_text', 'Let voice type text')}
       {@render toggle('voice.edit_commands', 'Editing commands')}
+      {@render pick('preferences.browser', 'Preferred browser', 'Opens a spoken search when no browser is open.')}
       {#if fields['voice.match_threshold']}
         <div class="srow">
           <div class="rtext"><div class="rname">How exact a command must be</div><div class="hint">Lower catches more of what you say, higher runs only close matches.</div></div>
@@ -422,7 +444,6 @@
 {@render listCard('words')}
     {@render listCard('repl')}
     {#if problem}<span class="problem" role="alert">{problem}</span>{/if}
-    {#if saved}<span class="saved mono" role="status">{saved}</span>{/if}
   </div>
   {/if}
   {:else if part !== 'talk'}
@@ -494,7 +515,8 @@
   input:not([type='range']):focus-visible { border-color: var(--ink); }
 
   /* ---- cards (the dictionary and fragments) */
-  .card { border: 1px solid var(--line); background: var(--surface); border-radius: var(--r-card); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; }
+  .card { border: 1px solid var(--line); background: var(--surface); border-radius: var(--r-card); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+  .card > * { flex-shrink: 0; }
   .chead { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 32px; }
   .seg { display: flex; gap: 2px; padding: 3px; border-radius: var(--r-pill); background: var(--hair); }
   .seg button { flex: 1; height: 30px; padding: 0 8px; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--muted); font-size: 12px; font-weight: 600; white-space: nowrap; }
@@ -510,22 +532,29 @@
   .search { width: 160px; border-radius: var(--r-pill) !important; font-family: var(--mono); font-size: 12px !important; }
   /* the two boxes side by side, the button under them, so a narrow card still fits */
   .add { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; }
-  .add1 { display: flex; gap: 8px; align-items: center; }
-  .add1 .main { flex: 1; min-width: 0; }
-  .add1 .addbtns { grid-column: auto; }
+  .add1 { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .add1 .main { flex: 1 1 140px; min-width: 0; }
+  .add1 .more { flex: none; height: 36px; padding: 0 14px; font-size: 13px; }
+  .add1 .addbtns { grid-column: auto; flex: none; }
   .sec { font-size: 13px; opacity: .9; }
-  .more { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; border: 1px dashed var(--ink); border-radius: 999px; background: transparent; padding: 8px 14px; color: var(--ink); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
-  .more b { font-size: 16px; line-height: 1; font-weight: 500; }
-  .more:hover, .more:focus-visible { background: var(--sunk); border-style: solid; }
-  .addbtns { grid-column: 1 / -1; display: flex; gap: 8px; justify-content: flex-end; }
+  .more { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; border: 1px dashed var(--line); border-radius: 999px; background: transparent; padding: 5px 12px; color: var(--muted); font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; }
+  .more b { font-size: 14px; line-height: 1; font-weight: 500; }
+  .more:hover, .more:focus-visible { background: var(--sunk); color: var(--ink); border-color: var(--muted); }
+  .addbtns { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
   .to { color: var(--faint); flex: none; }
   .words { flex: 1; min-height: 0; overflow-y: auto; border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); align-content: start; column-gap: 18px; }
   .words.full { grid-template-columns: minmax(0, 1fr); border-top: 0; }
   .words.fit { flex: none; overflow: visible; }
+  /* the card scrolls as a whole; the fragments list grows inside it instead of a second scrollbar */
+  .card .words { flex: none; overflow: visible; }
+  /* corrected words fill the room left in the card; what does not fit is behind the dots */
+  .card .words.clip { flex: 1 1 0; min-height: 110px; overflow: hidden; }
   .subrow { display: flex; align-items: center; justify-content: space-between; }
   .subrow .sub { padding: 12px 0 6px; }
-  .dots { border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--ink); padding: 0 12px; height: 24px; font: 600 14px/1 var(--mono); letter-spacing: .12em; cursor: pointer; }
-  .dots:hover, .dots:focus-visible { background: var(--sunk); }
+  .viewall { display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; padding: 2px 0; color: var(--ink); font: 600 12px/1 var(--mono); cursor: pointer; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px; }
+  .viewall svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s var(--ease); }
+  .viewall:hover, .viewall:focus-visible { text-decoration-color: var(--ink); }
+  .viewall:hover svg { transform: translate(1px, -1px); }
   .chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; }
   .chip { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; background: var(--sunk); max-width: 100%; }
   .chip.sel { border-color: var(--ink); }
@@ -558,7 +587,7 @@
   .del { width: 24px; height: 24px; flex: none; border-radius: 50%; border: 0; background: transparent; color: var(--muted); display: flex; align-items: center; justify-content: center; padding: 0; }
   .del:hover { color: var(--bad); }
   .del svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
-  .saved { font-size: 11px; color: var(--ok); }
+  .saved { font-size: 12px; font-weight: 600; color: var(--ok); white-space: nowrap; }
   .problem { font-size: 12px; color: var(--bad); }
   input[type='range'] { width: 100%; accent-color: var(--signal); }
 

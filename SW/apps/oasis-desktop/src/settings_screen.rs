@@ -35,6 +35,7 @@ pub(crate) struct FieldsReply {
 pub(crate) fn field_context() -> oasis_settings::fields::FieldContext {
     oasis_settings::fields::FieldContext {
         microphones: oasis_voice::device_names(),
+        speakers: oasis_voice::cue::output_names(),
         browsers: installed_browsers(),
     }
 }

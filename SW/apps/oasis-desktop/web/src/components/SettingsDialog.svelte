@@ -23,11 +23,9 @@
     { id: 'input', name: 'Pad & keys', about: 'How you press the three buttons: the OASIS interface, keyboard keys, or other ways. At least one stays on.', icon: 'M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM12 8h.01M12 12h.01M12 16h.01' },
     { id: 'voice', name: 'Voice', about: 'How a recording is turned into text and tidied, and what voice commands may do.', icon: 'M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM6 11a6 6 0 0 0 12 0M12 17v4' },
     { id: 'models', name: 'Voice models', about: 'The speech and polish models on this PC, and which set it uses.', icon: 'M4 7h16v10H4zM8 7V4M16 7V4M8 20v-3M16 20v-3M9 11h6v2H9z' },
-    { id: 'overlay', name: 'Overlay', about: 'The three bars on your screen. They rest faint until you press a button or talk.', icon: 'M3 5h18v11H3zM8 20h8M12 16v4' },
+    { id: 'overlay', name: 'Overlay & look', about: 'The three bars on your screen and how OASIS itself looks.', icon: 'M3 5h18v11H3zM8 20h8M12 16v4' },
     { id: 'gestures', name: 'Gestures', about: 'Pad gestures that work in every program, and the hidden YouTube gestures.', icon: 'M9 11V5a2 2 0 0 1 4 0v6M13 10V8a2 2 0 0 1 4 0v5a7 7 0 0 1-7 7 5 5 0 0 1-4.5-2.8L4 14a2 2 0 0 1 3.4-2L9 14' },
     { id: 'connections', soon: true, name: 'Connections', about: 'Your calendar, Spotify and the browser extension.', icon: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1' },
-    { id: 'appearance', name: 'Appearance', about: 'How OASIS itself looks.', icon: 'M12 3a9 9 0 1 0 0 18 3 3 0 0 0 0-6h-1a2 2 0 0 1 0-4h4a5 5 0 0 0-3-8zM7.5 11h.01M9.5 7h.01M14.5 7h.01' },
-    { id: 'preferences', name: 'Preferences', about: 'Choices OASIS uses when you do not name one, such as the browser a search opens in.', icon: 'M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z' },
     { id: 'general', name: 'General', about: 'Starting with Windows, button labels and scripts.', icon: 'M4 7h10M18 7h2M4 17h2M10 17h10M16 4v6M8 14v6' },
     { id: 'updates', name: 'Updates & data', about: 'New versions of OASIS, and reading your profiles from the file again.', icon: 'M12 4v11M7 10l5 5 5-5M5 20h14' },
     { id: 'activity', name: 'Activity', about: 'The last button press and what OASIS did recently.', icon: 'M3 12h4l3-8 4 16 3-8h4' },
@@ -200,7 +198,7 @@
           <div class="pane" bind:this={panes.input} hidden={current.id !== 'input'}><InputScreen /></div>
           <div class="pane" bind:this={panes.voice} hidden={current.id !== 'voice'}><VoiceScreen part="settings" /></div>
           <div class="pane" bind:this={panes.models} hidden={current.id !== 'models'}><ModelsCard /></div>
-          <div class="pane" bind:this={panes.overlay} hidden={current.id !== 'overlay'}><OverlayScreen /></div>
+          <div class="pane" bind:this={panes.overlay} hidden={current.id !== 'overlay'}><OverlayScreen /><AppearanceCard /></div>
           <div class="pane legacy" bind:this={panes.gestures} hidden={current.id !== 'gestures'}><div id="settings-gestures" class="groups"></div></div>
 
           <div class="pane legacy greyed" bind:this={panes.connections} hidden={current.id !== 'connections'}>
@@ -220,9 +218,7 @@
             </div>
           </div>
 
-          <div class="pane" bind:this={panes.appearance} hidden={current.id !== 'appearance'}><AppearanceCard /></div>
 
-          <div class="pane legacy" bind:this={panes.preferences} hidden={current.id !== 'preferences'}><div id="settings-preferences" class="groups"></div></div>
 
           <div class="pane legacy" bind:this={panes.general} hidden={current.id !== 'general'}>
             <section class="card" id="systemCard">
@@ -245,14 +241,6 @@
                 <div class="ctl"><button class="action quiet" onclick={() => { closeSettings(); guideSend('replay'); }}>Show me again</button></div>
               </div>
             </section>
-            <!-- last on purpose: the one button here that cannot be undone -->
-            <section class="card">
-              <div class="label">Data</div>
-              <div class="srow">
-                <div class="rtext"><div class="rname">Delete all data</div><div class="hint">Deletes every dictation recording and its text from Insights. This cannot be undone.</div><div class="msg" class:ok={wipe.ok} class:bad={!wipe.ok} role="status">{wipe.msg}</div></div>
-                <div class="ctl"><button class="action quiet danger" onclick={deleteAll}>Delete all data</button></div>
-              </div>
-            </section>
           </div>
 
           <div class="pane legacy" bind:this={panes.updates} hidden={current.id !== 'updates'}>
@@ -262,6 +250,13 @@
               <div class="srow">
                 <div class="rtext"><div class="rname">Reload profiles</div><div class="hint">Read profiles.json again, for example after the older OASIS app changed it.</div><div id="reloadMsg" class="msg" role="status"></div></div>
                 <div class="ctl"><button id="reload" class="action quiet">Reload from file</button></div>
+              </div>
+            </section>
+            <section class="card">
+              <div class="label">Data</div>
+              <div class="srow">
+                <div class="rtext"><div class="rname">Delete all data</div><div class="hint">Deletes every dictation recording and its text from Insights. This cannot be undone.</div><div class="msg" class:ok={wipe.ok} class:bad={!wipe.ok} role="status">{wipe.msg}</div></div>
+                <div class="ctl"><button class="action quiet danger" onclick={deleteAll}>Delete all data</button></div>
               </div>
             </section>
           </div>
