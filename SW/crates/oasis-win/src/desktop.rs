@@ -210,9 +210,13 @@ pub fn minimize(handle: i64) {
     per_monitor(|| unsafe { ShowWindow(handle as HWND, SW_MINIMIZE) });
 }
 
-/// Ask one window to close, as its own close button would (it may still ask to save).
+/// Ask one window to close, as its own close button would (it may still ask to save). Never the
+/// desktop or the taskbar ([`crate::window::is_shell_window`]): that opens the shut-down dialog.
 #[allow(unsafe_code)]
 pub fn close(handle: i64) -> bool {
+    if crate::window::is_shell_window(WindowId(handle as isize)) {
+        return false;
+    }
     // SAFETY: a stale handle makes the call fail, not fault.
     unsafe { PostMessageW(handle as HWND, WM_CLOSE, 0, 0) != 0 }
 }
@@ -240,6 +244,15 @@ pub fn set_outer(handle: i64, outer: Rect) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_desktop_is_never_asked_to_close() {
+        // "Program Manager" is the desktop: a close would open the shut-down dialog. Only the
+        // guard is exercised: `close` returns false before posting anything.
+        let Some(desktop) = app_windows().into_iter().find(|w| w.title == "Program Manager") else { return };
+        assert!(crate::window::is_shell_window(WindowId(desktop.handle as isize)));
+        assert!(!close(desktop.handle));
+    }
 
     #[test]
     fn this_machine_has_a_screen_with_a_work_area_inside_it() {

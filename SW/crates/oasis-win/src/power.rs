@@ -11,6 +11,28 @@ pub struct Power {
     pub saver: bool,
 }
 
+/// Tells Windows 11 not to slow this process down to save power (EcoQoS). Without it, on battery the
+/// app's threads run on the slow cores and a window that is hidden or out of focus (the HUD, the
+/// tray app) is throttled hardest: everything lags and the speech decode takes longer.
+#[allow(unsafe_code)]
+pub fn opt_out_of_throttling() {
+    use windows_sys::Win32::System::Threading::{
+        GetCurrentProcess, ProcessPowerThrottling, SetProcessInformation, PROCESS_POWER_THROTTLING_CURRENT_VERSION,
+        PROCESS_POWER_THROTTLING_EXECUTION_SPEED, PROCESS_POWER_THROTTLING_STATE,
+    };
+    // ControlMask set with StateMask clear = "do not throttle execution speed".
+    let state = PROCESS_POWER_THROTTLING_STATE {
+        Version: PROCESS_POWER_THROTTLING_CURRENT_VERSION,
+        ControlMask: PROCESS_POWER_THROTTLING_EXECUTION_SPEED,
+        StateMask: 0,
+    };
+    // SAFETY: `state` is a valid struct of the size passed; the pseudo-handle needs no closing. A
+    // Windows without the call (before 11) just returns 0, which is fine.
+    unsafe {
+        SetProcessInformation(GetCurrentProcess(), ProcessPowerThrottling, (&raw const state).cast(), size_of::<PROCESS_POWER_THROTTLING_STATE>() as u32);
+    }
+}
+
 /// The power state now. Cheap (no I/O); if Windows does not answer, plugged in.
 #[allow(unsafe_code)]
 pub fn status() -> Power {

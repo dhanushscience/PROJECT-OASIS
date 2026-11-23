@@ -605,11 +605,42 @@ mod browser_tests {
     }
 }
 
-/// Plays a WAV file held in memory, in the background, and returns at once. A sound already playing
-/// is cut off, so pressing a speaker button again never queues up. `wav` must stay valid while it plays.
-#[allow(unsafe_code)]
+/// Plays a WAV file held in memory and returns at once. A sound already playing is cut off, so
+/// pressing a speaker button again never queues up. The cue goes to one worker thread: the caller
+/// (the engine loop) never waits on the sound device, and only the latest cue is played. The worker
+/// pauses 15 ms after cutting a sound off, because `PlaySound` often drops a sound started in the
+/// same instant as the stop (the start cue that sometimes stayed silent). A failed start is retried
+/// once. `wav` must stay valid while it plays.
 pub fn play_wav(wav: &'static [u8]) {
+    use std::sync::{mpsc, OnceLock};
+    static WORKER: OnceLock<mpsc::Sender<&'static [u8]>> = OnceLock::new();
+    let tx = WORKER.get_or_init(|| {
+        let (tx, rx) = mpsc::channel::<&'static [u8]>();
+        let _ = std::thread::Builder::new().name("cue".into()).spawn(move || {
+            while let Ok(mut wav) = rx.recv() {
+                while let Ok(newer) = rx.try_recv() {
+                    wav = newer;
+                }
+                start_wav(wav);
+            }
+        });
+        tx
+    });
+    let _ = tx.send(wav);
+}
+
+#[allow(unsafe_code)]
+fn start_wav(wav: &'static [u8]) {
     use windows_sys::Win32::Media::Audio::{PlaySoundW, SND_ASYNC, SND_MEMORY, SND_NODEFAULT};
-    // SAFETY: `wav` is 'static, so it outlives the asynchronous playback.
-    unsafe { PlaySoundW(wav.as_ptr().cast(), std::ptr::null_mut(), SND_MEMORY | SND_ASYNC | SND_NODEFAULT) };
+    let play = || {
+        // SAFETY: `wav` is 'static, so it outlives the asynchronous playback.
+        unsafe { PlaySoundW(wav.as_ptr().cast(), std::ptr::null_mut(), SND_MEMORY | SND_ASYNC | SND_NODEFAULT) != 0 }
+    };
+    // SAFETY: a null sound name stops playback.
+    unsafe { PlaySoundW(std::ptr::null(), std::ptr::null_mut(), 0) };
+    std::thread::sleep(std::time::Duration::from_millis(15));
+    if !play() {
+        std::thread::sleep(std::time::Duration::from_millis(40));
+        play();
+    }
 }

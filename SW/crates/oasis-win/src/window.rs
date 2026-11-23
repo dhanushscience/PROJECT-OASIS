@@ -146,13 +146,25 @@ pub fn visible_windows() -> Vec<(String, String)> {
     programs
 }
 
+/// The desktop or the taskbar. Never closed: a close sent to "Program Manager" opens the
+/// shut-down dialog.
+#[allow(unsafe_code)]
+pub fn is_shell_window(window: WindowId) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::GetClassNameW;
+    let mut class = [0u16; 64];
+    // SAFETY: `class` is writable for its length, which is what we pass; a stale handle returns 0.
+    let len = unsafe { GetClassNameW(window.hwnd(), class.as_mut_ptr(), class.len() as i32) };
+    let class = String::from_utf16_lossy(&class[..len.max(0) as usize]);
+    matches!(class.as_str(), "Progman" | "WorkerW" | "Shell_TrayWnd" | "Shell_SecondaryTrayWnd")
+}
+
 /// Ask every titled, visible top-level window of the program named `process` to close, as its own
 /// close button would: the program may still ask to save. Returns how many windows were asked.
 /// The desktop and the taskbar are never asked (closing "Program Manager" opens the shut-down
 /// dialog), nor is OASIS itself.
 #[allow(unsafe_code)]
 pub fn close_program(process: &str) -> usize {
-    use windows_sys::Win32::UI::WindowsAndMessaging::{GetClassNameW, PostMessageW, WM_CLOSE};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{PostMessageW, WM_CLOSE};
     unsafe extern "system" fn collect(hwnd: HWND, lparam: LPARAM) -> i32 {
         // SAFETY: `lparam` is the address of the Vec passed to EnumWindows below, alive for the call.
         let found = unsafe { &mut *(lparam as *mut Vec<WindowId>) };
@@ -179,11 +191,7 @@ pub fn close_program(process: &str) -> usize {
         if process_name(pid).is_none_or(|n| n.trim_end_matches(".exe").to_lowercase() != wanted) {
             continue;
         }
-        let mut class = [0u16; 64];
-        // SAFETY: `class` is writable for its length, which is what we pass.
-        let len = unsafe { GetClassNameW(window.hwnd(), class.as_mut_ptr(), class.len() as i32) };
-        let class = String::from_utf16_lossy(&class[..len.max(0) as usize]);
-        if matches!(class.as_str(), "Progman" | "WorkerW" | "Shell_TrayWnd" | "Shell_SecondaryTrayWnd") {
+        if is_shell_window(window) {
             continue;
         }
         // SAFETY: posting to a window that has since closed simply fails.
