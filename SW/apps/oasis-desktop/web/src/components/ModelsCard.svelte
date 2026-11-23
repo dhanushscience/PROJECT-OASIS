@@ -57,7 +57,7 @@
   </Head>
   <div class="inuse">
     <div class="who">
-      <div class="big">{setName(info?.target) || 'None'}</div>
+      <div class="big">{setName(info?.target ?? null) || 'None'}</div>
       <div class="hint" role="status">{line}</div>
       {#if curSet}<p class="what">{curSet.what}</p>{/if}
     </div>

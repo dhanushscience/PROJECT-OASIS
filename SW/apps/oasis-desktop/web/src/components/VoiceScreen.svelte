@@ -224,7 +224,7 @@
     <input bind:value={fm.write} placeholder={t.write} aria-label={t.write} autocomplete="off" onkeydown={(e) => e.key === 'Enter' && addWord(k)} />
     <span class="addbtns">
       {#if saved}<span class="saved mono" role="status">✓ {saved}</span>{/if}
-      <button class="dark" disabled={(k !== 'words' && !fm.heard.trim()) || !fm.write.trim()} onclick={() => addWord(k)}>{fm.editing ? 'Update' : t.add}</button>
+      <button class="dark" disabled={!fm.heard.trim() || !fm.write.trim()} onclick={() => addWord(k)}>{fm.editing ? 'Update' : t.add}</button>
       {#if fm.editing}<button class="quiet" onclick={() => stopEditing(k)}>Cancel</button>{/if}
     </span>
   </div>

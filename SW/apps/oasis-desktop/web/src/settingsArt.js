@@ -60,7 +60,7 @@ export function icoNode(/** @type {string} */ name) {
   const span = document.createElement('span');
   span.className = 'ico';
   span.setAttribute('aria-hidden', 'true');
-  span.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS[name] ?? ''}"/></svg>`;
+  span.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS[/** @type {keyof typeof ICONS} */ (name)] ?? ''}"/></svg>`;
   return span;
 }
 
