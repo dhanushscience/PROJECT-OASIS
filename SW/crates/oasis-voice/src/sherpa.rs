@@ -8,9 +8,9 @@
 //! version, because the C API passes these structs by pointer and a different layout would be
 //! read as garbage. The tests prove the layout with a real model when one is present.
 //!
-//! A transducer (Parakeet) decodes with `modified_beam_search` and `length_reward` 0.5, which 2.0.2
-//! fixed for NeMo TDT models, so it can listen for names (hotwords) given per recording
-//! (`docs/OPEN_ANYTHING.md` stage 2, `VOICE_DECISIONS.md` V15).
+//! A transducer (Parakeet) decodes greedily. A recording with names to listen for (hotwords, given
+//! per recording) uses a second recognizer in `modified_beam_search` with `length_reward` 0.5, which
+//! 2.0.2 fixed for NeMo TDT models (`docs/OPEN_ANYTHING.md` stage 2, `VOICE_DECISIONS.md` V15).
 
 use std::ffi::{c_char, c_void, CStr, CString};
 use std::path::{Path, PathBuf};

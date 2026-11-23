@@ -4,10 +4,11 @@ use super::*;
 
 /// How the program in front wants dictation written (`docs/VOICE_DECISIONS.md` V7).
 pub(crate) fn dictation_style(foreground: &mut dyn ForegroundProbe) -> Style {
-    foreground.current().map_or(Style::Default, |info| {
+    let style = foreground.current().map_or(Style::Default, |info| {
         let context = ForegroundContext::from(&info);
         oasis_core::speech::style::for_app(&context.app_name, &context.url)
-    })
+    });
+    oasis_core::speech::style::with_tone(style, crate::polish::casual_tone())
 }
 
 /// What was heard goes to the focused app as typing, like a keyboard. In preview mode, or with a
@@ -32,6 +33,11 @@ pub(super) fn dictation_text(shared: &Shared, settings: &Settings, verified: boo
     let raw = heard.text.as_str();
     let mut trace = Vec::new();
     let text = clean_dictation(settings, raw, style, &heard.paragraphs, &mut trace);
+    // The `dictate` line is written when the text is heard; cleanup and S1-mini polish come after it.
+    if let Some(released) = heard.timing.released {
+        let line = format!("cleaned style={style:?} cleaned_ms={}", released.elapsed().as_millis());
+        SecurityLog::at(shared.paths.voice_timing_log()).write(&line);
+    }
     if let Some(note) = crate::polish::take_note() {
         SecurityLog::at(shared.paths.security_log()).write(&note);
     }
@@ -43,7 +49,7 @@ pub(super) fn dictation_text(shared: &Shared, settings: &Settings, verified: boo
         }
     }
     let voice = VoiceSettings::from(settings);
-    let typed = if voice.paste_tag { format!("{text} [typed using project OASIS] ") } else { format!("{text} ") };
+    let typed = format!("{text} ");
     // Paste off: still shown and kept, never typed or put on the clipboard.
     let verified = verified && voice.paste_dictation;
     if keep_on_clipboard && verified && shared.live.load(Ordering::SeqCst) {

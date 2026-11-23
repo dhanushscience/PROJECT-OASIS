@@ -207,6 +207,20 @@ fn ptt_hold_starts_capture_and_release_ends_it() {
 }
 
 #[test]
+fn another_button_during_a_talk_hold_does_not_lose_the_release() {
+    let c = ArbiterConfig { voice_enabled: true, push_to_talk_mask: ButtonMask::ONE, ..d() };
+    let down = step(&PadState::Idle, Down(ButtonId::ONE, at(0)), &c, &desk());
+    let talking = step(&down.next, Tick(at(500)), &c, &desk());
+    assert!(talking.has(&ArbiterEffect::StartVoiceCapture));
+    // a brush of another button while talking: neither it nor its release may end or forget the hold
+    let brush = step(&talking.next, Down(ButtonId::TWO, at(900)), &c, &desk());
+    assert!(!brush.dispatched(G::BoundTap), "no action runs while talking");
+    let brush_up = step(&brush.next, Up(ButtonId::TWO, at(950)), &c, &desk());
+    let up = step(&brush_up.next, Up(ButtonId::ONE, at(2000)), &c, &desk());
+    assert!(up.has(&ArbiterEffect::EndVoiceCapture), "letting go of the talk button must end the recording");
+}
+
+#[test]
 fn ptt_short_release_is_a_tap() {
     let c = ArbiterConfig {
         voice_enabled: true,

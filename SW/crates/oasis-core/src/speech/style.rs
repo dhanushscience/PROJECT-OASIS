@@ -49,6 +49,12 @@ pub fn for_app(app: &str, url: &str) -> Style {
     }
 }
 
+/// A casual tone picked in Settings is for everyday writing, not only chat: an app with no style of
+/// its own then writes like chat. Mail, notes and terminals keep theirs.
+pub fn with_tone(style: Style, casual: bool) -> Style {
+    if casual && style == Style::Default { Style::Message } else { style }
+}
+
 /// Chat style: one sentence loses its closing full stop ("Sounds good." → "Sounds good"). A
 /// question or exclamation mark, an ellipsis, or more than one sentence stays as it is.
 pub fn for_message(text: &str) -> String {
@@ -61,6 +67,15 @@ pub fn for_message(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_casual_tone_writes_everyday_apps_like_chat() {
+        assert_eq!(with_tone(Style::Default, true), Style::Message);
+        assert_eq!(with_tone(Style::Default, false), Style::Default);
+        for kept in [Style::Mail, Style::Notes, Style::Exact, Style::Message] {
+            assert_eq!(with_tone(kept, true), kept);
+        }
+    }
 
     #[test]
     fn programs_and_sites_get_their_style() {

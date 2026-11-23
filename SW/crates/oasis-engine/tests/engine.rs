@@ -1324,9 +1324,10 @@ fn dictation_is_cleaned_up_before_it_is_typed() {
     // One timing line for the recording: durations and counts, never the words.
     // Written just after the paste is handed on, so it may land a moment after the paste is seen.
     let read_log = || fs::read_to_string(v.h.paths.voice_timing_log()).unwrap_or_default();
-    v.h.wait(|_| read_log().contains(" dictate "), "the timing line");
+    v.h.wait(|_| read_log().contains(" dictate ") && read_log().contains(" cleaned "), "the timing lines");
     let log = read_log();
-    assert_eq!(log.lines().count(), 2, "{log}");
+    assert_eq!(log.lines().count(), 3, "press, heard, cleaned: {log}");
+    assert!(log.contains(" - cleaned style=Default cleaned_ms="), "cleanup time after release: {log}");
     assert!(log.lines().next().unwrap().contains(" - press cue_ms="), "the press line comes first: {log}");
     assert!(
         log.contains("dictate stt=local audio_ms=1500 ") && log.contains(" words=11"),

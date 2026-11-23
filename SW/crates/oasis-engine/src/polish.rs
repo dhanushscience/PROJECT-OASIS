@@ -70,7 +70,8 @@ fn scaled_wait(base_ms: u64, on_battery: bool, saver: bool) -> u64 {
 /// The control line; context "auto" is email in a mail program and general elsewhere.
 fn control(style: oasis_core::speech::style::Style) -> String {
     let (chosen, structure, context) = *lock(&OPTIONS);
-    // The chosen tone is for chat messages only; casual tone rewrote names and dropped full stops elsewhere.
+    // The chosen tone is for chat, and for everyday apps when it is casual (`dictation_style`); mail,
+    // notes and terminals stay semi-formal.
     let tone = if style == oasis_core::speech::style::Style::Message { chosen } else { DEFAULT_TONE };
     let context = match context {
         "auto" if style == oasis_core::speech::style::Style::Mail => "email",
@@ -78,6 +79,11 @@ fn control(style: oasis_core::speech::style::Style) -> String {
         c => c,
     };
     format!("[Styling: {tone}] [Structure: {structure}] [Context: {context}]")
+}
+
+/// The tone picked in Settings is casual or semi-casual (from the last [`sync`]).
+pub fn casual_tone() -> bool {
+    matches!(lock(&OPTIONS).0, "casual" | "semi-casual")
 }
 
 /// `control` plus the user's own Dictionary words (those added with no "heard as"), so the model

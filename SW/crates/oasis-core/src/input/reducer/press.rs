@@ -14,6 +14,14 @@ pub(super) fn on_down(
 ) -> Transition {
     let mut effects = Vec::new();
 
+    // While talking, only letting go of the talk button counts. Another press used to replace this
+    // state, so the release never ended the recording (it stayed open until the next hold).
+    if matches!(&state, PadState::Claimed { claim: GestureClaimId::VoicePtt, .. })
+        || matches!(&state, PadState::Pressed { arm, .. } if arm.voice_capturing)
+    {
+        return Transition::to(state);
+    }
+
     if state == PadState::VoiceLocked {
         // The next press of the talk button ends the recording, like letting go of a hold.
         if !config.push_to_talk_mask.contains(button) {

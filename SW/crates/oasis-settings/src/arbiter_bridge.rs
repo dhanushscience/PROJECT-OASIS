@@ -37,7 +37,7 @@ pub fn arbiter_config(settings: &Settings, voice_model_present: bool) -> Arbiter
         double_click_window: millis(int(yt, "DoubleClickMs", 300)),
         volume_push_to_talk_floor: Duration::from_millis(700),
         hold2x_threshold: millis(int(yt, "Hold2xThresholdMs", 250)),
-        push_to_talk_hold: millis(int(voice, "PushToTalkHoldMs", 200)),
+        push_to_talk_hold: millis(200),
         ai_hold_duration: millis(ai_hold),
         // Double-click for volume on YouTube is switched off (owner, 2026-11-18): a single tap on
         // those buttons waited for a second tap and, with labels hidden for the profile, was lost.

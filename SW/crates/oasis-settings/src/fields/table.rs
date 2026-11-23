@@ -56,15 +56,6 @@ pub(super) fn specs(ctx: &FieldContext, settings: &Settings) -> Vec<Spec> {
             kind: Kind::Toggle,
         },
         Spec {
-            id: "general.paste_tag",
-            section: "general",
-            label: "Add “[typed using project OASIS]” after pasted dictation",
-            hint: "Off by default. When on, that note in square brackets is pasted right after the text you spoke. It is not added to Insights.",
-            place: Place::In("Voice", "PasteTag"),
-            default: json!(false),
-            kind: Kind::Toggle,
-        },
-        Spec {
             id: "general.allow_scripts",
             section: "general",
             label: "Allow scripts",
@@ -315,15 +306,6 @@ pub(super) fn specs(ctx: &FieldContext, settings: &Settings) -> Vec<Spec> {
             place: Place::TalkButtons,
             default: json!("0"),
             kind: Kind::Choice(talk_presets()),
-        },
-        Spec {
-            id: "voice.hold_ms",
-            section: "voice",
-            label: "Hold time",
-            hint: "How long to hold before listening starts.",
-            place: Place::In("Voice", "PushToTalkHoldMs"),
-            default: json!(200),
-            kind: Kind::Choice([200, 350, 500, 750, 1000].iter().map(|ms| (json!(ms), format!("{ms} ms"))).collect()),
         },
         Spec {
             id: "voice.capture_mode",

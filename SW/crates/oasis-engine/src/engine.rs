@@ -101,7 +101,13 @@ struct HeldCapture {
     requests: Vec<VoiceEvent>,
     /// The start of the press line for the timing log; the focus time is added with the answer.
     press_line: Option<String>,
+    /// When it began: the answer is not waited for past `CAPTURE_WAIT` (see the loop).
+    since: StdInstant,
 }
+
+/// The longest a recording's start waits for the front thread (UI Automation can hang on a
+/// misbehaving program). Then it is typed, and the release that queued behind it goes through.
+const CAPTURE_WAIT: Duration = Duration::from_millis(1500);
 
 fn run_loop<T: PadTransport + 'static>(
     shared: &Arc<Shared>,
@@ -530,7 +536,10 @@ fn run_loop<T: PadTransport + 'static>(
                 let since = |at: StdInstant| at.saturating_duration_since(down).as_millis();
                 format!("press cue_ms={} hud_ms={} mic_open_ms={mic_open_ms}", since(cue_at), since(shown_at))
             });
-            capture = Some(HeldCapture { requests: Vec::new(), press_line });
+            // Not replaced while one still waits: that would drop its queued release.
+            if capture.is_none() {
+                capture = Some(HeldCapture { requests: Vec::new(), press_line, since: StdInstant::now() });
+            }
         }
         effects.retain(|effect| match effect {
             ArbiterEffect::StartVoiceCapture => {
@@ -570,6 +579,10 @@ fn run_loop<T: PadTransport + 'static>(
                         voice.request(request, now, &ctx);
                     }
                 }
+            }
+            let timed_out = capture.as_ref().is_some_and(|c| c.since.elapsed() >= CAPTURE_WAIT);
+            if captured.is_none() && timed_out {
+                captured = Some((true, CAPTURE_WAIT.as_millis()));
             }
             if let Some((dictate, focus_ms, waiting)) = captured.and_then(|(d, f)| Some((d, f, capture.take()?))) {
                 // One line per capture start: where the time between the press and the feedback went.

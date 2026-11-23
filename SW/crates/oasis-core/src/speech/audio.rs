@@ -167,12 +167,9 @@ pub const SPEECH_HANGOVER_FRAMES: usize = 10;
 pub const SPEECH_RMS_MIN: f32 = 300.0;
 pub const SPEECH_RMS_MAX: f32 = 600.0;
 
-/// Frame loudness after the same boost [`normalize`] gives, so a quiet microphone is judged by the
-/// thresholds below as a normal one is.
 fn frame_rms(samples: &[f32], rate: u32) -> Vec<f32> {
     let window = (rate as usize * DEFAULT_WINDOW_MS / 1000).max(1);
-    let gain = quiet_gain(samples);
-    samples.chunks_exact(window).map(|w| (w.iter().map(|s| s * s).sum::<f32>() / window as f32).sqrt() * 32768.0 * gain).collect()
+    samples.chunks_exact(window).map(|w| (w.iter().map(|s| s * s).sum::<f32>() / window as f32).sqrt() * 32768.0).collect()
 }
 
 /// One flag per 20 ms frame: speech starts after [`SPEECH_START_FRAMES`] loud frames (flagged from
@@ -182,7 +179,10 @@ fn speech_frames(samples: &[f32], rate: u32, hangover: usize) -> Vec<bool> {
     let mut sorted = rms.clone();
     sorted.sort_by(|a, b| a.total_cmp(b));
     let floor = sorted.get(sorted.len() / 10).copied().unwrap_or(0.0); // 10th percentile
-    let loud: Vec<bool> = rms.iter().map(|r| *r >= (floor * 2.0).clamp(SPEECH_RMS_MIN, SPEECH_RMS_MAX)).collect();
+    // A quiet microphone (the gain [`normalize`] gives) only lowers the minimum: boosting the frames
+    // instead lifted room hiss past `SPEECH_RMS_MAX`, and no pause was ever found.
+    let min = SPEECH_RMS_MIN / quiet_gain(samples);
+    let loud: Vec<bool> = rms.iter().map(|r| *r >= (floor * 2.0).clamp(min, SPEECH_RMS_MAX)).collect();
     let mut flags = vec![false; loud.len()];
     let mut i = 0;
     while i < loud.len() {
@@ -310,6 +310,25 @@ mod tests {
     /// `parts` of (milliseconds, loud) at 16 kHz.
     fn talk(parts: &[(usize, bool)]) -> Vec<f32> {
         parts.iter().flat_map(|(ms, loud)| std::iter::repeat_n(if *loud { 0.3 } else { 0.001 }, ms * 16)).collect()
+    }
+
+    /// Regression (2026-11-23): the quiet-mic gain lifted room hiss past `SPEECH_RMS_MAX`, so a quiet
+    /// microphone never showed a pause and long dictations were decoded only after release.
+    #[test]
+    fn a_quiet_microphone_with_room_hiss_still_finds_the_pause() {
+        let mut seed = 1u32;
+        let mut hiss = move || {
+            seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            ((seed >> 8) as f32 / 8_388_608.0 - 1.0) * 0.008
+        };
+        let clip: Vec<f32> = [(6000, true), (1500, false), (3000, true)]
+            .iter()
+            .flat_map(|&(ms, talk)| (0..ms * 16).map(move |i| if talk { 0.05 * (i as f32 * 0.2).sin() } else { 0.0 }))
+            .map(|s| s + hiss())
+            .collect();
+        assert!(quiet_gain(&clip) > 4.0, "the clip must be one the gain lifts");
+        let cut = segment_cut(&clip, 16_000).expect("the 1.5 s pause is found");
+        assert!((6000 * 16..7500 * 16).contains(&cut), "cut {cut} is inside the pause");
     }
 
     #[test]

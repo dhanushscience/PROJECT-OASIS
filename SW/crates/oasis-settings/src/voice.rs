@@ -43,8 +43,6 @@ pub struct VoiceSettings {
     pub keep_trace: bool,
     /// Type the dictation where the cursor is. On by default; off only transcribes (and keeps it).
     pub paste_dictation: bool,
-    /// Follow the pasted dictation with "[typed using project OASIS]". Off by default.
-    pub paste_tag: bool,
     /// A short sound when the mic opens and when the text is pasted. On by default.
     pub sounds: bool,
 }
@@ -81,7 +79,6 @@ impl VoiceSettings {
             keep_history: voice.and_then(|v| v.get("KeepHistory")).and_then(Value::as_bool).unwrap_or(false),
             keep_trace: voice.and_then(|v| v.get("KeepDictationTrace")).and_then(Value::as_bool).unwrap_or(false),
             paste_dictation: voice.and_then(|v| v.get("PasteDictation")).and_then(Value::as_bool).unwrap_or(true),
-            paste_tag: voice.and_then(|v| v.get("PasteTag")).and_then(Value::as_bool).unwrap_or(false),
             sounds: voice.and_then(|v| v.get("Sounds")).and_then(Value::as_bool).unwrap_or(true),
         }
     }
