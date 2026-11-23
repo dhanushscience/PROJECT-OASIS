@@ -225,7 +225,7 @@ mod tests {
     #[test]
     fn what_the_user_put_on_a_button_or_approved_before_is_trusted() {
         let trusted = trusted_targets(&with_profiles());
-        assert!(trusted.contains("launchapp:code"), "{trusted:?}");
+        assert!(trusted.contains(r"launchapp:c:\apps\code.exe"), "a button's program, by its path: {trusted:?}");
         assert!(trusted.contains("openurl:https://example.com"), "{trusted:?}");
         assert!(trusted.contains("launchapp:spotify"), "approved by voice before");
         assert!(!trusted.contains("launchapp:notepad"));
@@ -237,7 +237,7 @@ mod tests {
         let steps = vec![("LaunchApp".to_string(), "C:\\Apps\\Notepad.exe".to_string()), ("Shortcut".to_string(), "Ctrl+T".to_string())];
         assert!(s.trust_voice_targets(&steps));
         assert!(!s.trust_voice_targets(&steps), "the second time adds nothing");
-        assert!(trusted_targets(&s).contains("launchapp:notepad"));
+        assert!(trusted_targets(&s).contains(r"launchapp:c:\apps\notepad.exe"));
         let voice = s.extra.get("Voice").unwrap();
         assert_eq!(voice["MatchThreshold"], 0.8, "other voice settings are untouched");
         assert_eq!(voice["IntentTrustedTargets"].as_array().unwrap().len(), 2);

@@ -176,8 +176,15 @@ fn normalize_target(kind: &str, value: &str) -> String {
     }
 }
 
-/// A program is trusted by its file name, without folder or `.exe`.
+/// A program named bare ("spotify") is trusted by that name, without `.exe`. One given by a full
+/// path is trusted by the whole path: a `Spotify.exe` dropped in Downloads must not inherit the trust
+/// given to the installed Spotify.
 fn normalize_launch_target(value: &str) -> String {
+    let bytes = value.as_bytes();
+    let absolute = value.starts_with("\\\\") || (bytes.len() > 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' && matches!(bytes[2], b'\\' | b'/'));
+    if absolute {
+        return value.replace('/', "\\").to_lowercase();
+    }
     let name = value.rsplit(['\\', '/']).next().filter(|n| !n.is_empty()).unwrap_or(value);
     let name = name.strip_suffix(".exe").or_else(|| name.strip_suffix(".EXE")).unwrap_or(name);
     name.to_lowercase()
@@ -326,10 +333,14 @@ mod tests {
 
     #[test]
     fn a_new_app_asks_once_and_a_trusted_one_runs() {
-        let launch = act("LaunchApp", "C:\\Program Files\\Spotify\\Spotify.exe");
+        let launch = act("LaunchApp", "Spotify");
         assert_eq!(fast_path(&launch, &trusted(&[]), ApprovalMode::FirstUse), FastPath::Ask);
         assert_eq!(fast_path(&launch, &trusted(&["launchapp:spotify"]), ApprovalMode::FirstUse), FastPath::Run);
         assert_eq!(fast_path(&launch, &trusted(&["LaunchApp:SPOTIFY"]), ApprovalMode::FirstUse), FastPath::Run, "case does not matter");
+        // A program by full path is trusted by that path only: a planted copy does not borrow the name's trust.
+        let planted = act("LaunchApp", r"C:\Users\me\Downloads\Spotify.exe");
+        assert_eq!(fast_path(&planted, &trusted(&["launchapp:spotify"]), ApprovalMode::FirstUse), FastPath::Ask);
+        assert_eq!(fast_path(&planted, &trusted(&[r"launchapp:c:\users\me\downloads\spotify.exe"]), ApprovalMode::FirstUse), FastPath::Run);
         assert_eq!(fast_path(&launch, &trusted(&[]), ApprovalMode::RiskyOnly), FastPath::Run, "risky-only trusts routine apps");
         // Only looking: a place, a folder, a document. A program on the Desktop still asks.
         for value in ["shell:RecycleBinFolder", r"C:\Users\me\Desktop\Project\", r"C:\Users\me\Desktop\Report.pdf"] {
@@ -341,7 +352,9 @@ mod tests {
 
     #[test]
     fn target_keys_are_stable() {
-        assert_eq!(target_key("LaunchApp", "C:\\Apps\\Notepad.exe"), "launchapp:notepad");
+        assert_eq!(target_key("LaunchApp", "C:\\Apps\\Notepad.exe"), r"launchapp:c:\apps\notepad.exe");
+        assert_eq!(target_key("LaunchApp", "C:/Apps/Notepad.exe"), r"launchapp:c:\apps\notepad.exe");
+        assert_eq!(target_key("LaunchApp", "Notepad.exe"), "launchapp:notepad");
         assert_eq!(target_key("LaunchApp", "\"Spotify\""), "launchapp:spotify");
         assert_eq!(target_key("OpenUrl", "https://Example.com/"), "openurl:https://example.com");
         assert_eq!(target_key("PasteText", "Hello"), "pastetext:hello");

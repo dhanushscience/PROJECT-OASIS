@@ -503,7 +503,11 @@ fn try_open(normalized: &str, transcript: &str, settings: &RouterSettings) -> Op
     let app = guess_app_from_text_if(target, &|a| settings.is_installed(a));
     // "notepad" is the app, not the "Notepad++" shortcut: against an app, the name must match
     // letter for letter, symbols included.
-    let same_name = |item: &super::on_screen::ScreenItem| app.is_none() || item.stem().to_lowercase() == shown;
+    // A program on screen never stands in for an installed app: a planted "Spotify.exe" in Downloads
+    // must not run when the user means Spotify.
+    let same_name = |item: &super::on_screen::ScreenItem| {
+        app.is_none() || (item.stem().to_lowercase() == shown && super::on_screen::is_plain_open(&item.launch_value()))
+    };
     match super::on_screen::find(shown, &settings.on_screen) {
         super::on_screen::Found::Exact(item) if same_name(item) => return Some(open_item(item)),
         super::on_screen::Found::Close(item) if app.is_none() => return Some(open_item(item)),
@@ -807,6 +811,10 @@ mod tests {
         }
         assert_eq!(value("open recycle bin", &g).as_deref(), Some("shell:RecycleBinFolder"), "the full place name is still the place");
         assert_eq!(value("open bin", &RouterSettings::default()).as_deref(), Some("shell:RecycleBinFolder"), "no BIN folder on screen");
+        // A planted program with an installed app's exact name does not stand in for the app.
+        let planted = RouterSettings { on_screen: vec![item("chrome", true)], ..RouterSettings::default() };
+        assert_eq!(value("open chrome", &RouterSettings { on_screen: vec![item("chrome.exe", false)], ..RouterSettings::default() }).as_deref(), Some("chrome"));
+        assert_eq!(value("open chrome", &planted).as_deref(), Some(r"C:\Users\me\Desktop\chrome\"), "a folder of that name still opens");
         let both = RouterSettings { on_screen: vec![item("Project old", true), item("Project new", true)], ..RouterSettings::default() };
         let r = route("open project", &[], &both);
         assert!(!r.success && r.message.unwrap().contains("Project old, Project new"));
