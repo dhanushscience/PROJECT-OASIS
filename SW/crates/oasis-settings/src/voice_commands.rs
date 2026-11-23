@@ -71,6 +71,8 @@ pub fn router_settings(settings: &Settings) -> RouterSettings {
         running: Vec::new(),
         installed: None,
         edit_commands: section.and_then(|v| v.get("EditCommands")).and_then(Value::as_bool).unwrap_or(true),
+        on_screen: Vec::new(),
+        app_names: Vec::new(),
     }
 }
 

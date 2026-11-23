@@ -58,6 +58,11 @@ pub fn resolve(spoken: &str) -> Option<&'static str> {
     PAGES.iter().find(|(names, _)| names.iter().any(|n| flatten(n) == wanted)).map(|(_, uri)| *uri)
 }
 
+/// Every name a page goes by, with its address: for "did you mean …?" (`docs/OPEN_ANYTHING.md` stage 3).
+pub fn names() -> impl Iterator<Item = (&'static str, &'static str)> {
+    PAGES.iter().flat_map(|(names, uri)| names.iter().map(move |n| (*n, *uri)))
+}
+
 /// True for an address on the list. This is what `OpenSettings` checks before opening anything.
 pub fn is_known(uri: &str) -> bool {
     PAGES.iter().any(|(_, u)| *u == uri)

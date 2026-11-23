@@ -17,6 +17,8 @@ use crate::overlay::css_color;
 #[derive(Debug, Clone, Default)]
 pub struct FieldContext {
     pub microphones: Vec<String>,
+    /// The speakers this computer has, for the start and end sounds.
+    pub speakers: Vec<String>,
     /// Web browsers installed on this PC: `(process name, name to show)`.
     pub browsers: Vec<(String, String)>,
 }

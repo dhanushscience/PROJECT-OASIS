@@ -265,6 +265,20 @@ pub(super) fn specs(ctx: &FieldContext, settings: &Settings) -> Vec<Spec> {
             mics.push((json!(saved), format!("{saved} (not connected)")));
         }
     }
+    let mut speakers = vec![(json!(""), "System default".to_string())];
+    speakers.extend(ctx.speakers.iter().map(|m| (json!(m), m.clone())));
+    let saved_speaker = settings
+        .extra
+        .get("Voice")
+        .and_then(|v| v.get("SpeakerDeviceName"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|m| !m.is_empty());
+    if let Some(saved) = saved_speaker {
+        if !ctx.speakers.iter().any(|m| m == saved) {
+            speakers.push((json!(saved), format!("{saved} (not connected)")));
+        }
+    }
     list.extend([
         Spec {
             id: "voice.enabled",
@@ -285,6 +299,15 @@ pub(super) fn specs(ctx: &FieldContext, settings: &Settings) -> Vec<Spec> {
             kind: Kind::Choice(mics),
         },
         Spec {
+            id: "voice.speaker",
+            section: "voice",
+            label: "Sound output",
+            hint: "Where the start and end sounds play. Pick the speaker you hear, if a USB microphone takes over the default.",
+            place: Place::In("Voice", "SpeakerDeviceName"),
+            default: json!(""),
+            kind: Kind::Choice(speakers),
+        },
+        Spec {
             id: "voice.talk_buttons",
             section: "voice",
             label: "Buttons to hold",
@@ -299,7 +322,7 @@ pub(super) fn specs(ctx: &FieldContext, settings: &Settings) -> Vec<Spec> {
             label: "Hold time",
             hint: "How long to hold before listening starts.",
             place: Place::In("Voice", "PushToTalkHoldMs"),
-            default: json!(350),
+            default: json!(200),
             kind: Kind::Choice([200, 350, 500, 750, 1000].iter().map(|ms| (json!(ms), format!("{ms} ms"))).collect()),
         },
         Spec {

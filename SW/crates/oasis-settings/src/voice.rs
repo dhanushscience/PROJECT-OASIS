@@ -15,6 +15,8 @@ pub struct VoiceSettings {
     pub push_to_talk_buttons: Vec<i32>,
     /// A possibly shortened microphone name; empty means the default microphone.
     pub microphone: String,
+    /// The speaker for the start and end sounds; empty means the system default.
+    pub speaker: String,
     /// The folder under `Models\stt`.
     pub model_folder: String,
     /// Recordings shorter than this are treated as an accidental press.
@@ -60,6 +62,7 @@ impl VoiceSettings {
                 .map(|a| a.iter().filter_map(Value::as_i64).filter_map(|i| i32::try_from(i).ok()).collect())
                 .unwrap_or_else(|| vec![0]),
             microphone: text("MicrophoneDeviceName").unwrap_or_default(),
+            speaker: text("SpeakerDeviceName").unwrap_or_default(),
             model_folder: text("ModelFileName")
                 .filter(|m| !m.is_empty() && is_plain_folder_name(m))
                 .unwrap_or_else(|| DEFAULT_STT_MODEL_FOLDER.to_string()),

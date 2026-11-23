@@ -37,7 +37,7 @@ impl ArbiterConfig {
             double_click_window: ms(300),
             volume_push_to_talk_floor: ms(700),
             hold2x_threshold: ms(250),
-            push_to_talk_hold: ms(350),
+            push_to_talk_hold: ms(200),
             ai_hold_duration: ms(5000),
             volume_up: Some(ButtonId::ONE),
             volume_down: Some(ButtonId::THREE),
