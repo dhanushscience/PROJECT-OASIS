@@ -23,6 +23,21 @@ pub const DLL_NAME: &str = "sherpa-onnx-c-api.dll";
 /// The DLL's own dependency; it must be in the same folder.
 pub const ONNX_RUNTIME_DLL: &str = "onnxruntime.dll";
 
+/// Why Windows refused a DLL, in words a tester can act on. libloading's own text is only
+/// "LoadLibraryExW failed"; the reason is in its source (the Windows error and its code).
+fn load_failure(error: &libloading::Error) -> String {
+    use std::error::Error;
+    let os = error.source().map(|s| s.to_string()).unwrap_or_default();
+    let code: Option<u32> = os.rsplit("os error ").next().and_then(|t| t.trim_end_matches(')').trim().parse().ok());
+    let hint = match code {
+        Some(126) => " A file it needs is missing: reinstall OASIS (onnxruntime.dll must sit beside it) and run Windows Update.",
+        Some(193 | 216) => " This DLL is not built for this kind of PC.",
+        Some(5 | 225 | 1260 | 1261 | 4551) => " Windows or an antivirus blocked it: check Smart App Control (Windows Security, App & browser control) and the antivirus quarantine for the OASIS folder.",
+        _ => "",
+    };
+    if os.is_empty() { "LoadLibraryExW failed (no reason given).".into() } else { format!("{os}.{hint}") }
+}
+
 // ---- the C structs, in header order ------------------------------------------------------------
 
 type Cstr = *const c_char;
@@ -397,7 +412,7 @@ impl SherpaTransducer {
         let library = unsafe {
             libloading::os::windows::Library::load_with_flags(&dll, 0x0000_0008)
                 .map(Library::from)
-                .map_err(|e| fail(format!("The speech engine ({}) could not be loaded: {e}", dll.display())))?
+                .map_err(|e| fail(format!("The speech engine ({}) could not be loaded: {}", dll.display(), load_failure(&e))))?
         };
         macro_rules! symbol {
             ($name:literal, $ty:ty) => {
