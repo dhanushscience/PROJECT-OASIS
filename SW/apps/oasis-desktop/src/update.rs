@@ -46,22 +46,9 @@ pub fn start(app: &AppHandle) {
     change(app, |i| i.current = version);
     let app = app.clone();
     std::thread::spawn(move || {
-        let mut asked: Option<String> = None;
+        // The themed pop-up (UpdatePrompt.svelte) listens to `update-status` and asks the person.
         loop {
-            let info = tauri::async_runtime::block_on(check(&app));
-            // Ask once per new version; "No" is not repeated until a newer one appears (Settings still offers Install).
-            if let Some(v) = info.available.filter(|v| asked.as_ref() != Some(v)) {
-                asked = Some(v.clone());
-                let text = format!("A new version of OASIS is available ({v}). Do you want to upgrade now?
-
-OASIS will restart.");
-                #[cfg(windows)]
-                if oasis_win::shell::ask_yes_no("OASIS update", &text) {
-                    let _ = tauri::async_runtime::block_on(install_update(app.clone()));
-                }
-                #[cfg(not(windows))]
-                let _ = text;
-            }
+            tauri::async_runtime::block_on(check(&app));
             std::thread::sleep(CHECK_EVERY);
         }
     });
