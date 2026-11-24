@@ -36,6 +36,9 @@
     table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 14px; line-height: 1.5; background: var(--card); }
     th, td { padding: 10px 12px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
     th { background: var(--soft); font-weight: 600; }
+    .glance { min-width: 640px; }
+    .glance th.yes { color: #2f7d52; } .glance th.no { color: #a8453c; }
+    .glance td { font-size: 13.5px; }
     footer { padding: 24px 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; text-align: center; }
     @media (max-width: 520px) { body { font-size: 15px; } h1 { font-size: 23px; } h2 { font-size: 17px; } }
   </style>
@@ -48,31 +51,37 @@
 
   <main>
     <h1>OASIS Privacy Policy</h1>
-    <p class="ver">Version 2 · 23 November 2026</p>
-
-    <p>This page explains, in plain words, what OASIS collects, why, and what you can do about it. It is written to follow India's Digital Personal Data Protection Act, 2023 (the "DPDP Act") and its 2025 Rules, which I follow now even though their main duties begin later, in 2027.</p>
+    <p class="ver">Version 2 · Last updated 24 November 2026</p>
 
     <section class="short" aria-labelledby="short">
-      <h2 id="short">The short version</h2>
+      <h2 id="short">In short</h2>
       <ul>
-        <li>Collecting anything is <strong>optional and off</strong> until you say yes. OASIS works exactly the same if you say no.</li>
-        <li>If you say yes, OASIS sends me <strong>three numbers, once a day</strong>:
-          <ol>
-            <li>how many <strong>words</strong> you dictated,</li>
-            <li>how many <strong>dictations</strong> you made,</li>
-            <li>how many of those dictations you <strong>corrected by hand</strong> afterwards.</li>
-          </ol>
-        </li>
-        <li>They are sent with the date, your OASIS version number, and a few technical details listed below. That is all.</li>
-        <li>I never collect what you say or type, your words, names, files, windows, programs, or anything that tells me who you are.</li>
-        <li>You can turn it off any time. Counting stops at once and the counts kept on your PC are deleted.</li>
+        <li>OASIS turns your speech into text <strong>on your own PC</strong>. Your voice never leaves it.</li>
+        <li>No account. No ads. I never sell your information or use it to train models.</li>
+        <li>One optional thing can leave your PC: <strong>three numbers a day</strong>. It is <strong>off until you say yes</strong>, and OASIS works exactly the same if you say no.</li>
+        <li>This page follows India's Digital Personal Data Protection Act, 2023 (the "DPDP Act") and its 2025 Rules, which I follow now even though their main duties begin in 2027.</li>
       </ul>
     </section>
+
+    <h2>At a glance</h2>
+    <div class="scroll">
+      <table class="glance">
+        <thead><tr><th class="yes" scope="col">✓ Sent, only if you turn it on</th><th class="no" scope="col">✕ Never collected</th><th scope="col">🔒 Stays on your PC</th></tr></thead>
+        <tbody>
+          <tr><td>Words you dictated that day (one number)</td><td>What you say or type, any audio or text</td><td>Your voice and microphone audio</td></tr>
+          <tr><td>Dictations you made that day (one number)</td><td>Names, email addresses, phone numbers</td><td>Your transcripts and any dictation history</td></tr>
+          <tr><td>Dictations you corrected by hand (one number)</td><td>Files, windows, programs, websites</td><td>Your settings, profiles and button setups</td></tr>
+          <tr><td>Date, OASIS version, send time, a random message number</td><td>Your location, device or advertising ID, IP address</td><td>Your Groq key, if you add one (encrypted by Windows)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Each number is a count. OASIS never sends the words themselves.</p>
 
     <h2>Who I am</h2>
     <p>I am Dhanush, the developer of OASIS, and I decide why and how this information is used (the DPDP Act calls this a "Data Fiduciary"). You can reach me, and the person who handles privacy questions, at <a href="mailto:oasis-privacy@protonmail.com">oasis-privacy@protonmail.com</a>.</p>
 
     <h2>What is collected</h2>
+    <p>Only if you say yes:</p>
     <div class="scroll">
       <table>
         <thead><tr><th scope="col">What</th><th scope="col">Example</th><th scope="col">Why</th></tr></thead>
@@ -87,13 +96,21 @@
         </tbody>
       </table>
     </div>
-    <p>Each number is a count. OASIS never sends the words themselves.</p>
-
     <h2>What is never collected</h2>
     <p>What you say or type, any dictated text or audio, names, email addresses, phone numbers, file names, window titles, program names, websites, your location, a device or advertising ID, or your IP address. OASIS does not give your computer any lasting ID (each summary gets its own random number), so I cannot follow one person from one day to the next.</p>
 
     <h2>Why, and only why</h2>
     <p>I use the numbers for one thing: to understand whether OASIS is useful and improving, and to show that progress to people who help fund the project. I do not use them for anything else, and I do not sell or share them.</p>
+
+    <h2>Stored on your PC</h2>
+    <p>Settings, profiles, button setups and any dictation history stay on your PC, so you manage and delete them in the app. Dictation history is opt-in. A Groq key, if you add one, is encrypted by Windows. None of this reaches me.</p>
+
+    <h2>Other connections OASIS can make</h2>
+    <p>None of these carry the three numbers, and none involve me receiving anything from you.</p>
+    <ul>
+      <li><strong>Updates and speech models.</strong> OASIS checks GitHub for a newer version and downloads speech models from there. GitHub sees a normal download request, like any website visit, under its own policy.</li>
+      <li><strong>Optional cloud cleanup (Groq).</strong> Only if you add your own Groq key. Then the text of a dictation goes from your PC straight to Groq to be tidied, under Groq's policy and not mine. Leave it out and your dictation never leaves your PC.</li>
+    </ul>
 
     <h2>Your choice (consent)</h2>
     <ul>
@@ -118,7 +135,7 @@
 
     <h2>Your rights under the DPDP Act</h2>
     <p>You can ask me to: tell you what I hold about you; correct it; erase it; or fix a problem with how I handle it. You can also name another person to exercise these rights for you if you die or cannot.</p>
-    <p>Please be aware of one honest limit. The numbers are <strong>not linked to you</strong>: no name, no ID, no address. That means I cannot find "your" numbers among everyone else's, so I cannot show or delete them one by one. What I can always do is stop collecting (you can do this yourself by turning it off) and tell you exactly what OASIS sends.</p>
+    <p>One honest limit: the numbers are <strong>not linked to you</strong> (no name, no ID, no address), so I cannot find "your" numbers among everyone else's, and cannot show or delete them one by one. What I can always do is stop collecting (you can do this yourself by turning it off) and tell you exactly what OASIS sends.</p>
     <p>To ask anything, or to complain, write to <a href="mailto:oasis-privacy@protonmail.com">oasis-privacy@protonmail.com</a>. I will answer as quickly as I can and always within 90 days. If I have not solved the problem, you may complain to the <strong>Data Protection Board of India</strong>.</p>
 
     <h2>Keeping it safe</h2>
@@ -126,10 +143,10 @@
     <p>If something went wrong that put anyone's data at risk, I would tell the people affected and the Data Protection Board without delay, with a full report within 72 hours as the Rules require. Since nothing identifies you, a notice would be posted with the OASIS release notes on GitHub.</p>
 
     <h2>Changes</h2>
-    <p>If I change what is collected or why, I will change the version number at the top. OASIS then <strong>stops sending until you answer the new question</strong>, so a change can never apply to you without your yes.</p>
+    <p>If I change what is collected or why, I will change the version number and the date at the top. OASIS then <strong>stops sending until you answer the new question</strong>, so a change can never apply to you without your yes.</p>
 
-    <h2>About this policy</h2>
-    <p>I wrote this policy myself to follow the Act. It has not yet been reviewed by a lawyer.</p>
+    <h2>Contact</h2>
+    <p><a href="mailto:oasis-privacy@protonmail.com">oasis-privacy@protonmail.com</a>, for questions, requests or complaints.</p>
   </main>
 
   <footer>© 2026 PROJECT OASIS</footer>
