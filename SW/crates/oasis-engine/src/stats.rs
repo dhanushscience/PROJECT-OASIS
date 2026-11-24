@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::telemetry::civil;
 
 /// Summaries one install may send in a calendar month.
-pub const MAX_PER_MONTH: u32 = 31;
+pub const MAX_PER_MONTH: u32 = 400; // HACKATHON: was 31 (one a day); 2-hourly sends need more room
 /// Days an unsent count is kept; older ones are dropped rather than sent late.
 pub(crate) const KEEP_DAYS: i64 = 14;
 
@@ -75,6 +75,11 @@ impl Stats {
         };
         *field = field.saturating_add(n);
         self.save();
+    }
+
+    /// Words counted and not yet taken for sending.
+    pub fn pending_words(&self) -> u64 {
+        self.days.values().map(|c| c.words).sum()
     }
 
     /// Consent is off: forget every count and delete the file.
@@ -138,6 +143,16 @@ mod tests {
         assert_eq!(sent, vec![(100, Counts { words: 15, dictations: 2, corrections: 0 })]);
         assert!(s.take_finished(true, 101).is_empty(), "sent once");
         assert_eq!(s.take_finished(true, 102).len(), 1, "day 101 is finished on day 102");
+    }
+
+    #[test]
+    fn pending_words_drop_to_zero_once_taken() {
+        let mut s = fresh("pending");
+        s.count(true, Metric::Words, 600, 100);
+        s.count(true, Metric::Words, 500, 101);
+        assert_eq!(s.pending_words(), 1100);
+        s.take_finished(true, 102);
+        assert_eq!(s.pending_words(), 0);
     }
 
     #[test]

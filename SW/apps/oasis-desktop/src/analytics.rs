@@ -23,6 +23,12 @@ static STATS: OnceLock<Mutex<Stats>> = OnceLock::new();
 static ON: AtomicBool = AtomicBool::new(false);
 const FIRST_SEND_AFTER: Duration = Duration::from_secs(30);
 const SEND_EVERY: Duration = Duration::from_secs(3 * 60 * 60);
+/// HACKATHON switch. Above 0: a summary goes out each time this many words have been dictated
+/// since the last one (1000, 2000, ...), today's count included, and there is no timer. Set it to
+/// 0 for the normal behaviour: one summary per finished day, checked every 3 hours.
+const SEND_EVERY_WORDS: u64 = 1000;
+static APP: OnceLock<AppHandle> = OnceLock::new();
+static SENDING: AtomicBool = AtomicBool::new(false);
 /// The full policy, on the website (a page not linked from the home page; docs/ANALYTICS.md).
 const POLICY_URL: &str = "https://dhanushscience.github.io/PROJECT-OASIS/privacy.html";
 
@@ -60,25 +66,55 @@ pub fn start(app: &AppHandle) {
     let Some(paths) = oasis_engine::defaults::detect_paths() else { return };
     let profiles = paths.profiles();
     let version = app.package_info().version.to_string();
-    let telemetry = TELEMETRY.get_or_init(|| Telemetry::load(profiles.with_file_name("telemetry_queue.json"), ANALYTICS_KEY, &version));
-    let stats = STATS.get_or_init(|| Mutex::new(Stats::load(profiles.with_file_name("usage_stats.json"))));
+    TELEMETRY.get_or_init(|| Telemetry::load(profiles.with_file_name("telemetry_queue.json"), ANALYTICS_KEY, &version));
+    STATS.get_or_init(|| Mutex::new(Stats::load(profiles.with_file_name("usage_stats.json"))));
     if let Some(s) = settings(app) {
         apply(&s);
     }
+    let _ = APP.set(app.clone());
     let app = app.clone();
     std::thread::spawn(move || {
         std::thread::sleep(FIRST_SEND_AFTER);
+        if SEND_EVERY_WORDS > 0 {
+            // Words counted before this launch may already be past the mark.
+            send_if_milestone();
+            return;
+        }
         loop {
-            if let Some(s) = settings(&app) {
-                apply(&s);
-                let finished = stats.lock().map(|mut st| st.take_finished(allowed(&s), today())).unwrap_or_default();
-                for (day, counts) in finished {
-                    telemetry.track_day(&s, day, &counts);
-                }
-                telemetry.flush(&|| settings(&app).is_some_and(|s| allowed(&s)));
-            }
+            send_now(&app);
             std::thread::sleep(SEND_EVERY);
         }
+    });
+}
+
+/// Queues what is due and sends what is waiting. Slow: call it from a background thread.
+fn send_now(app: &AppHandle) {
+    let (Some(telemetry), Some(stats)) = (TELEMETRY.get(), STATS.get()) else { return };
+    let Some(s) = settings(app) else { return };
+    apply(&s);
+    // By words, today's count goes too (as a slice of the day); by timer only finished days do.
+    let upto = if SEND_EVERY_WORDS > 0 { today() + 1 } else { today() };
+    let finished = stats.lock().map(|mut st| st.take_finished(allowed(&s), upto)).unwrap_or_default();
+    for (day, counts) in finished {
+        telemetry.track_day(&s, day, &counts);
+    }
+    telemetry.flush(&|| settings(app).is_some_and(|s| allowed(&s)));
+}
+
+/// Starts a send in the background when `SEND_EVERY_WORDS` unsent words have piled up.
+fn send_if_milestone() {
+    if SEND_EVERY_WORDS == 0 || !ON.load(Ordering::SeqCst) {
+        return;
+    }
+    let due = STATS.get().and_then(|s| s.lock().ok().map(|st| st.pending_words())).is_some_and(|w| w >= SEND_EVERY_WORDS);
+    let Some(app) = APP.get() else { return };
+    if !due || SENDING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let app = app.clone();
+    std::thread::spawn(move || {
+        send_now(&app);
+        SENDING.store(false, Ordering::SeqCst);
     });
 }
 
@@ -99,6 +135,7 @@ pub fn on_engine_event(event: &oasis_engine::EngineEvent) {
     if let oasis_engine::EngineEvent::Transcript { text, typed: true } = event {
         count(Metric::Dictations, 1);
         count(Metric::Words, text.split_whitespace().count() as u64);
+        send_if_milestone();
     }
 }
 
